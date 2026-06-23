@@ -1,24 +1,30 @@
 'use client'
 
 // Home Page - The Entry Point
-// Connects Canvas + Experience + ScrollManager + UI overlays
 
 import Canvas from '@/components/core/Canvas'
 import Experience from '@/components/core/Experience'
 import ScrollManager from '@/components/core/ScrollManager'
 import SceneDebugger from '@/components/ui/SceneDebugger'
+import LoadingScreen from '@/components/scenes/00_Loading/LoadingScreen'
+import AudioPrompt from '@/components/ui/AudioPrompt'
 
 export default function Home() {
   return (
     <>
-      {/* 3D Canvas (fixed, full screen, background layer) */}
+      {/* Loading Screen (shows first, fades out) */}
+      <LoadingScreen />
+
+      {/* Audio Prompt (shows after loading) */}
+      <AudioPrompt />
+
+      {/* 3D Canvas */}
       <Canvas>
         <Experience />
       </Canvas>
 
-      {/* Scrollable area (drives scene transitions) */}
+      {/* Scrollable area + UI overlays */}
       <ScrollManager>
-        {/* UI overlays render here */}
         <SceneDebugger />
       </ScrollManager>
     </>
