@@ -8,17 +8,18 @@ import ScrollManager from '@/components/core/ScrollManager'
 import SceneDebugger from '@/components/ui/SceneDebugger'
 import LoadingScreen from '@/components/scenes/00_Loading/LoadingScreen'
 import AudioPrompt from '@/components/ui/AudioPrompt'
+import HeroText from '@/components/scenes/01_Awakening/HeroText'
 
 export default function Home() {
   return (
     <>
-      {/* Loading Screen (shows first, fades out) */}
+      {/* Loading Screen */}
       <LoadingScreen />
 
-      {/* Audio Prompt (shows after loading) */}
+      {/* Audio Prompt */}
       <AudioPrompt />
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas with Face */}
       <Canvas>
         <Experience />
       </Canvas>
@@ -26,6 +27,7 @@ export default function Home() {
       {/* Scrollable area + UI overlays */}
       <ScrollManager>
         <SceneDebugger />
+        <HeroText />
       </ScrollManager>
     </>
   )

@@ -1,65 +1,59 @@
 'use client'
 
 // Experience Component
-// The master controller of the entire 3D scene
+// The master 3D scene controller
+// Renders face + lighting + scene-specific elements
 
-import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
 import { useSceneStore } from '@/store/useSceneStore'
+import FacePlaceholder from '@/components/face/FacePlaceholder'
+import Awakening from '@/components/scenes/01_Awakening/Awakening'
 
 export default function Experience() {
-  const cubeRef = useRef()
-  const scrollProgress = useSceneStore(state => state.scrollProgress)
-
-  useFrame((state, delta) => {
-    if (cubeRef.current) {
-      // Continuous rotation
-      cubeRef.current.rotation.x += delta * 0.5
-      cubeRef.current.rotation.y += delta * 0.3
-      
-      // Scale based on scroll (1x to 2x)
-      const targetScale = 1 + scrollProgress * 1.5
-      cubeRef.current.scale.x = targetScale
-      cubeRef.current.scale.y = targetScale
-      cubeRef.current.scale.z = targetScale
-      
-      // Keep position fixed (no movement)
-      cubeRef.current.position.x = 0
-      cubeRef.current.position.y = 0
-      cubeRef.current.position.z = 0
-    }
-  })
+  const currentScene = useSceneStore(state => state.currentScene)
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.3} />
+      {/* Cinematic Lighting Setup */}
+      <ambientLight intensity={0.1} />
+      
+      {/* Key light (main dramatic light) */}
       <directionalLight 
         position={[5, 5, 5]} 
-        intensity={1} 
+        intensity={1.2} 
+        color="#ffffff"
       />
+      
+      {/* Rim light (blue accent from left) */}
       <pointLight 
         position={[-5, 2, 3]} 
-        intensity={1.5} 
+        intensity={2} 
         color="#4a90d9"
+        distance={15}
       />
+      
+      {/* Fill light (purple accent from right) */}
       <pointLight 
-        position={[5, -2, 3]} 
-        intensity={1} 
+        position={[5, -1, 3]} 
+        intensity={1.5} 
         color="#8b5cf6"
+        distance={15}
       />
 
-      {/* TEMPORARY: Placeholder cube */}
-      <mesh ref={cubeRef}>
-        <boxGeometry args={[1.5, 1.5, 1.5]} />
-        <meshStandardMaterial 
-          color="#4a90d9" 
-          metalness={0.8} 
-          roughness={0.2}
-          emissive="#4a90d9"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
+      {/* Top light (subtle highlight) */}
+      <pointLight 
+        position={[0, 5, 2]} 
+        intensity={0.8} 
+        color="#00d4ff"
+        distance={10}
+      />
+
+      {/* THE FACE - Always present, transforms based on scene */}
+      <FacePlaceholder />
+
+      {/* Scene Controllers - These manage state, no visual output */}
+      <Awakening />
+
+      {/* More scenes will be added here as we build them */}
     </>
   )
 }
