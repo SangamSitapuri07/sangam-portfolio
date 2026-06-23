@@ -1,10 +1,10 @@
 'use client'
 
 // Experience Component
-// The master 3D scene controller
+// Now uses REAL face model instead of placeholder
 
 import { useSceneStore } from '@/store/useSceneStore'
-import FacePlaceholder from '@/components/face/FacePlaceholder'
+import FaceModel from '@/components/face/FaceModel'
 import Awakening from '@/components/scenes/01_Awakening/Awakening'
 import Cracks from '@/components/scenes/02_Cracks/Cracks'
 import CrackEffect from '@/components/scenes/02_Cracks/CrackEffect'
@@ -12,33 +12,36 @@ import ShatterEffect from '@/components/scenes/02_Cracks/ShatterEffect'
 import ScreenShake from '@/components/effects/ScreenShake'
 
 export default function Experience() {
-  const currentScene = useSceneStore(state => state.currentScene)
-
   return (
     <>
-      {/* Cinematic Lighting */}
-      <ambientLight intensity={0.1} />
+      {/* Cinematic Lighting (better for skin tones) */}
+      <ambientLight intensity={0.3} />
       
+      {/* Key light */}
       <directionalLight 
         position={[5, 5, 5]} 
-        intensity={1.2} 
+        intensity={1.5} 
         color="#ffffff"
+        castShadow
       />
       
+      {/* Rim light (blue) */}
       <pointLight 
-        position={[-5, 2, 3]} 
+        position={[-3, 2, 3]} 
         intensity={2} 
         color="#4a90d9"
         distance={15}
       />
       
+      {/* Fill light (purple) */}
       <pointLight 
-        position={[5, -1, 3]} 
+        position={[3, -1, 3]} 
         intensity={1.5} 
         color="#8b5cf6"
         distance={15}
       />
 
+      {/* Top accent */}
       <pointLight 
         position={[0, 5, 2]} 
         intensity={0.8} 
@@ -46,19 +49,19 @@ export default function Experience() {
         distance={10}
       />
 
-      {/* THE FACE */}
-      <FacePlaceholder />
+      {/* YOUR REAL FACE */}
+      <FaceModel />
 
-      {/* Crack lines on face */}
+      {/* Crack lines */}
       <CrackEffect />
 
-      {/* Particles for shatter */}
+      {/* Shatter particles */}
       <ShatterEffect />
 
-      {/* Camera shake during shatter */}
+      {/* Camera shake */}
       <ScreenShake />
 
-      {/* Scene Controllers (manage state) */}
+      {/* Scene Controllers */}
       <Awakening />
       <Cracks />
     </>

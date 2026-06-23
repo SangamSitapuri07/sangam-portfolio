@@ -1,153 +1,210 @@
 'use client'
 
-// Shatter Effect
-// Thousands of particles that explode outward when face shatters
-// Particles drift afterwards before reforming
+// Face Model with DISSOLVE SHATTER EFFECT
+// Face actually breaks apart during shatter
 
-import { useRef, useMemo } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
+import { useFaceStore } from '@/store/useFaceStore'
 import { useSceneStore } from '@/store/useSceneStore'
+import { useMouseTracker } from '@/hooks/useMouseTracker'
 import * as THREE from 'three'
 
-const PARTICLE_COUNT = 3000
-
-export default function ShatterEffect() {
-  const pointsRef = useRef()
+export default function FaceModel() {
+  const groupRef = useRef()
+  const modelRef = useRef()
+  
+  const { scene } = useGLTF('/models/face.glb')
+  
+  const isVisible = useFaceStore(state => state.isVisible)
+  const opacity = useFaceStore(state => state.opacity)
+  const trackingEnabled = useFaceStore(state => state.trackingEnabled)
+  const scale = useFaceStore(state => state.scale)
   const scrollProgress = useSceneStore(state => state.scrollProgress)
+  
+  const mouse = useMouseTracker()
 
-  // Generate particle data (positions, velocities, colors)
-  const { positions, originalPositions, velocities, colors } = useMemo(() => {
-    const positions = new Float32Array(PARTICLE_COUNT * 3)
-    const originalPositions = new Float32Array(PARTICLE_COUNT * 3)
-    const velocities = new Float32Array(PARTICLE_COUNT * 3)
-    const colors = new Float32Array(PARTICLE_COUNT * 3)
+  const targetRotation = useRef({ x: 0, y: 0 })
+  const currentRotation = useRef({ x: 0, y: 0 })
+  const breathingPhase = useRef(0)
 
-    // Color palette for particles
-    const particleColors = [
-      new THREE.Color('#00d4ff'),
-      new THREE.Color('#8b5cf6'),
-      new THREE.Color('#ffffff'),
-      new THREE.Color('#4a90d9'),
-    ]
+  // Custom dissolve shader uniforms
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uDissolveAmount: { value: 0 },
+    uDissolveColor: { value: new THREE.Color('#00d4ff') },
+    uEdgeWidth: { value: 0.05 },
+  }), [])
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3
+  // Apply custom shader to all materials
+  useEffect(() => {
+    if (scene) {
+      scene.traverse((child) => {
+        if (child.isMesh) {
+          // Store original material
+          if (!child.userData.originalMaterial) {
+            child.userData.originalMaterial = child.material
+          }
 
-      // Distribute on sphere surface (face shape)
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      const radius = 1.5 + Math.random() * 0.2
+          // Modify shader to add dissolve effect
+          child.material.onBeforeCompile = (shader) => {
+            shader.uniforms.uTime = uniforms.uTime
+            shader.uniforms.uDissolveAmount = uniforms.uDissolveAmount
+            shader.uniforms.uDissolveColor = uniforms.uDissolveColor
+            shader.uniforms.uEdgeWidth = uniforms.uEdgeWidth
 
-      const x = radius * Math.sin(phi) * Math.cos(theta)
-      const y = radius * Math.sin(phi) * Math.sin(theta)
-      const z = radius * Math.cos(phi)
+            // Add varyings
+            shader.vertexShader = shader.vertexShader.replace(
+              '#include <common>',
+              `
+              #include <common>
+              varying vec3 vWorldPos;
+              `
+            )
 
-      originalPositions[i3] = x
-      originalPositions[i3 + 1] = y
-      originalPositions[i3 + 2] = z
+            shader.vertexShader = shader.vertexShader.replace(
+              '#include <fog_vertex>',
+              `
+              #include <fog_vertex>
+              vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+              `
+            )
 
-      positions[i3] = x
-      positions[i3 + 1] = y
-      positions[i3 + 2] = z
+            // Fragment shader: add dissolve effect
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <common>',
+              `
+              #include <common>
+              uniform float uTime;
+              uniform float uDissolveAmount;
+              uniform vec3 uDissolveColor;
+              uniform float uEdgeWidth;
+              varying vec3 vWorldPos;
+              
+              // Simple noise function
+              float random(vec3 p) {
+                return fract(sin(dot(p, vec3(12.9898, 78.233, 45.543))) * 43758.5453);
+              }
+              
+              float noise(vec3 p) {
+                vec3 i = floor(p);
+                vec3 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                
+                float n000 = random(i);
+                float n100 = random(i + vec3(1.0, 0.0, 0.0));
+                float n010 = random(i + vec3(0.0, 1.0, 0.0));
+                float n110 = random(i + vec3(1.0, 1.0, 0.0));
+                float n001 = random(i + vec3(0.0, 0.0, 1.0));
+                float n101 = random(i + vec3(1.0, 0.0, 1.0));
+                float n011 = random(i + vec3(0.0, 1.0, 1.0));
+                float n111 = random(i + vec3(1.0, 1.0, 1.0));
+                
+                float nx00 = mix(n000, n100, f.x);
+                float nx10 = mix(n010, n110, f.x);
+                float nx01 = mix(n001, n101, f.x);
+                float nx11 = mix(n011, n111, f.x);
+                
+                float nxy0 = mix(nx00, nx10, f.y);
+                float nxy1 = mix(nx01, nx11, f.y);
+                
+                return mix(nxy0, nxy1, f.z);
+              }
+              `
+            )
 
-      // Explosion velocity (outward from center)
-      const speed = 0.5 + Math.random() * 1.5
-      velocities[i3] = x * speed * 0.5
-      velocities[i3 + 1] = y * speed * 0.5
-      velocities[i3 + 2] = z * speed * 0.5
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <dithering_fragment>',
+              `
+              #include <dithering_fragment>
+              
+              // Generate noise pattern for dissolve
+              float noiseValue = noise(vWorldPos * 8.0);
+              float dissolveThreshold = uDissolveAmount;
+              
+              // Discard pixels based on noise + threshold
+              if (noiseValue < dissolveThreshold) {
+                discard;
+              }
+              
+              // Add glowing edge effect
+              float edge = smoothstep(dissolveThreshold, dissolveThreshold + uEdgeWidth, noiseValue);
+              vec3 edgeColor = uDissolveColor * (1.0 - edge) * 3.0;
+              gl_FragColor.rgb += edgeColor;
+              `
+            )
 
-      // Random color from palette
-      const color = particleColors[Math.floor(Math.random() * particleColors.length)]
-      colors[i3] = color.r
-      colors[i3 + 1] = color.g
-      colors[i3 + 2] = color.b
+            // Store reference to update uniforms
+            child.material.userData.shader = shader
+          }
+          
+          // Force material to recompile
+          child.material.needsUpdate = true
+          
+          if (child.material.roughness !== undefined) {
+            child.material.roughness = 0.7
+            child.material.metalness = 0.1
+          }
+        }
+      })
     }
+  }, [scene, uniforms])
 
-    return { positions, originalPositions, velocities, colors }
-  }, [])
+  useFrame((state, delta) => {
+    if (!groupRef.current) return
 
-  useFrame((state) => {
-    if (!pointsRef.current) return
+    // Update time uniform
+    uniforms.uTime.value = state.clock.elapsedTime
 
-    // Calculate shatter progress (0 to 1)
-    // Shatter happens between 17% - 22% scroll
-    let shatterProgress = 0
+    // Calculate dissolve amount based on scroll
+    let dissolveAmount = 0
     
-    if (scrollProgress >= 0.17 && scrollProgress < 0.22) {
-      shatterProgress = (scrollProgress - 0.17) / 0.05
+    if (scrollProgress >= 0.15 && scrollProgress < 0.22) {
+      // Dissolve happens during crack + shatter
+      dissolveAmount = (scrollProgress - 0.15) / 0.07
     } else if (scrollProgress >= 0.22) {
-      shatterProgress = 1
+      dissolveAmount = 1
+    }
+    
+    uniforms.uDissolveAmount.value = dissolveAmount
+
+    // Breathing animation
+    breathingPhase.current += delta * 0.8
+    const breath = Math.sin(breathingPhase.current) * 0.015
+    groupRef.current.position.y = 0 + breath
+
+    // Mouse tracking
+    if (trackingEnabled) {
+      targetRotation.current.y = mouse.normalizedX * 0.3
+      targetRotation.current.x = -mouse.normalizedY * 0.15
+      
+      currentRotation.current.x = THREE.MathUtils.lerp(
+        currentRotation.current.x,
+        targetRotation.current.x,
+        0.06
+      )
+      currentRotation.current.y = THREE.MathUtils.lerp(
+        currentRotation.current.y,
+        targetRotation.current.y,
+        0.06
+      )
+      
+      groupRef.current.rotation.x = currentRotation.current.x
+      groupRef.current.rotation.y = currentRotation.current.y
     }
 
-    // Visibility: only show during shatter
-    if (scrollProgress < 0.16 || scrollProgress > 0.30) {
-      pointsRef.current.visible = false
-      return
-    }
-    pointsRef.current.visible = true
-
-    // Update particle positions
-    const posArray = pointsRef.current.geometry.attributes.position.array
-    const time = state.clock.elapsedTime
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3
-      
-      // Ease out for dramatic effect
-      const easedProgress = 1 - Math.pow(1 - shatterProgress, 3)
-      
-      // Distance from original position
-      const explosionDistance = easedProgress * 4
-      
-      // Add some swirl/turbulence
-      const turbulence = Math.sin(time * 2 + i * 0.1) * 0.1 * easedProgress
-      
-      posArray[i3] = originalPositions[i3] + velocities[i3] * explosionDistance + turbulence
-      posArray[i3 + 1] = originalPositions[i3 + 1] + velocities[i3 + 1] * explosionDistance + turbulence
-      posArray[i3 + 2] = originalPositions[i3 + 2] + velocities[i3 + 2] * explosionDistance
-    }
-
-    pointsRef.current.geometry.attributes.position.needsUpdate = true
-
-    // Fade out as we move past the shatter scene
-    if (scrollProgress > 0.22) {
-      const fadeProgress = (scrollProgress - 0.22) / 0.08
-      pointsRef.current.material.opacity = Math.max(0, 1 - fadeProgress)
-    } else {
-      pointsRef.current.material.opacity = 1
-    }
+    // Apply scale
+    groupRef.current.scale.setScalar(scale * 2.5)
   })
 
+  if (!isVisible) return null
+
   return (
-    <points 
-      ref={pointsRef} 
-      position={[-2.5, 0, 0]} 
-      scale={1.8}
-      visible={false}
-    >
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={PARTICLE_COUNT}
-          array={positions}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          count={PARTICLE_COUNT}
-          array={colors}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.04}
-        vertexColors
-        transparent
-        opacity={1}
-        sizeAttenuation
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <group ref={groupRef} position={[-2.5, 0, 0]}>
+      <primitive ref={modelRef} object={scene} />
+    </group>
   )
 }
+
+useGLTF.preload('/models/face.glb')
