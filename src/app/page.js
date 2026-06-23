@@ -1,14 +1,26 @@
+'use client'
+
+// Home Page - The Entry Point
+// Connects Canvas + Experience + ScrollManager + UI overlays
+
+import Canvas from '@/components/core/Canvas'
+import Experience from '@/components/core/Experience'
+import ScrollManager from '@/components/core/ScrollManager'
+import SceneDebugger from '@/components/ui/SceneDebugger'
+
 export default function Home() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-black text-white">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold mb-4">
-          Sangam Yadav
-        </h1>
-        <p className="text-xl text-gray-400">
-          Portfolio Loading...
-        </p>
-      </div>
-    </main>
+    <>
+      {/* 3D Canvas (fixed, full screen, background layer) */}
+      <Canvas>
+        <Experience />
+      </Canvas>
+
+      {/* Scrollable area (drives scene transitions) */}
+      <ScrollManager>
+        {/* UI overlays render here */}
+        <SceneDebugger />
+      </ScrollManager>
+    </>
   )
 }
