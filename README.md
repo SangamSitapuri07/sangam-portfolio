@@ -84,7 +84,7 @@ npm run lint       # eslint, no errors
 
 | Command | What it proves |
 | --- | --- |
-| `verify:content` | 501 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
+| `verify:content` | 427 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
 | `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that no wide shot parks the machine under the copy column |
 | `verify:dom` | Boots the app in jsdom: zero console errors, one `h1`, working fallback links |
 | `verify:screens` | Paints every screen at every quality tier: correct copy, not blank, no overlapping text, no text off the panel, no glyph outside the font |

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import { projects, moreOnGitHub } from '@/data/projects'
+import { projects } from '@/data/projects'
 import { Card, SectionHeading } from '@/components/ui'
 
 /**
@@ -184,24 +184,6 @@ export default function Projects() {
         ))}
       </div>
 
-      <div className="space-y-2 border-t border-line pt-4">
-        <p className="eyebrow">More on GitHub</p>
-        <ul className="flex flex-wrap gap-x-5 gap-y-2">
-          {moreOnGitHub.map((repo) => (
-            <li key={repo.href}>
-              <a
-                href={repo.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex items-baseline gap-2 text-xs text-ink-soft transition-colors hover:text-ink"
-              >
-                <span className="font-medium">{repo.name}</span>
-                <span className="text-ink-faint">{repo.description}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   )
 }

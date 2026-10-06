@@ -1,5 +1,5 @@
 import { profile } from '@/data/profile'
-import { projects, moreOnGitHub } from '@/data/projects'
+import { projects } from '@/data/projects'
 import { skillCategories } from '@/data/skills'
 import { timeline, achievements } from '@/data/timeline'
 import { Button, Card, Chip, SectionHeading } from '@/components/ui'
@@ -128,23 +128,6 @@ export default function FallbackPortfolio() {
           ))}
         </ul>
 
-        <div className="space-y-2">
-          <p className="eyebrow">More on GitHub</p>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2">
-            {moreOnGitHub.map((repo) => (
-              <li key={repo.href}>
-                <a
-                  href={repo.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-ink-soft hover:text-ink"
-                >
-                  {repo.name} — <span className="text-ink-faint">{repo.description}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
       </section>
 
       <section

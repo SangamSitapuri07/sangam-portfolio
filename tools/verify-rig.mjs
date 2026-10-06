@@ -260,7 +260,7 @@ try {
 
     /* Composition is scored on two reliable points — the middle of the display and
        the centre of the machine — because a bounding box at close range has
-       corners behind the camera that project to nonsense. The five project beats
+       corners behind the camera that project to nonsense. The project beats
        are deliberate close-ups (the screen is meant to sit behind the cards), so
        they are reported but not scored. */
     const region = TEXT_REGION[overlayAnchor[key.sceneId] ?? 'center']

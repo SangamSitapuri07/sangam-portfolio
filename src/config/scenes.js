@@ -136,8 +136,9 @@ export const scenes = [
   {
     id: 'projects',
     name: 'Projects',
-    /* The strongest section, and the longest in scroll: one beat per project. */
-    height: 265,
+    /* The longest section in scroll: one beat per project on the CV. Three beats
+       need less runway than five did, so the scene is shorter than it once was. */
+    height: 175,
     /* Every beat is a push-in: the display is the backdrop behind the cards, so
        composition is judged as a close-up rather than a full-machine shot. */
     framing: 'closeup',

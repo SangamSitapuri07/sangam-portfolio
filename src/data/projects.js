@@ -1,10 +1,16 @@
 /**
- * Projects — five real, shipped projects.
+ * Projects — the three projects listed in SangamCV.pdf, and nothing else.
  *
- * Every link in this file was verified against the public GitHub API
- * (github.com/SangamSitapuri07) and every claim comes from the repository
- * README or SangamCV.pdf. Descriptions are rewritten for a recruiter's
- * 10-second scan, but no capability is invented.
+ * Every claim below is a sentence from the CV's PROJECTS section. No repository
+ * README, no GitHub metadata, no portfolio copy of my own: if a line is here, it
+ * is because the CV says it. The only edits are mechanical — the PDF text
+ * extractor drops spaces around links ("Gemini and GroqAI models"), and those are
+ * repaired.
+ *
+ * Links are the CV's own: the GitHub link and the "Live Demo" link printed beside
+ * each project. Two of the three demos are videos (both Nuno and News Pinch are
+ * apps you cannot open in a browser — a Flutter client and a Kotlin Android app),
+ * which is why the demo environment plays them rather than embedding them.
  *
  * Rendering contract (kept deliberately renderer-agnostic):
  *   screen.mode   → which generated laptop-screen UI the project uses
@@ -14,69 +20,33 @@
 
 export const projects = [
   {
-    id: 'orca',
-    index: '01',
-    name: 'ORCA',
-    subtitle: 'Ocean routing & condition adviser · SIH × ISRO',
-    year: '2026',
-    tagline: 'Tells a fishing skipper where it is safe to go — using only live ocean data.',
-    summary:
-      'Built for the Smart India Hackathon ISRO problem statement. A FastAPI engine pulls twelve live marine sources, reasons over them with a ten-agent pipeline, and returns a route verified every two kilometres against the GLOBE land mask.',
-    role: 'Backend & intelligence engine',
-    tech: ['Python', 'FastAPI', 'Multi-agent pipeline', 'PostGIS / land mask', 'Next.js & Flutter clients'],
-    highlights: [
-      'Twelve live ocean sources — no dummy data anywhere',
-      'Ten-agent reasoning: risk, ecology, anomaly, validation',
-      'Courses verified every 2 km against the GLOBE 1 km land mask',
-      'Bilingual skipper advisories using WMO / IMD thresholds',
-      'A failing source is reported with its real reason — never invented values',
-    ],
-    stats: [
-      { value: '12', label: 'live data sources' },
-      { value: '10', label: 'reasoning agents' },
-      { value: '2 km', label: 'route verification' },
-    ],
-    links: {
-      github: 'https://github.com/SangamSitapuri07/ORCA-backend',
-      live: null,
-      extra: {
-        label: 'Client app & dashboard',
-        href: 'https://github.com/SangamSitapuri07/SIH',
-      },
-    },
-    screen: { mode: 'map', accent: '#3FA9F5' },
-    cover: { from: '#062033', via: '#0A3550', to: '#05060A', mark: 'ORCA' },
-  },
-
-  {
     id: 'nuno',
-    index: '02',
+    index: '01',
     name: 'Nuno',
-    subtitle: 'Real-time multiplayer card game',
-    year: '2026',
+    subtitle: 'Real Time Multiplayer Card Game',
+    year: 'Aug 2026',
     tagline: 'Eight players, one deck, and a server that will not let you cheat.',
     summary:
-      'A real-time card game with rooms, rating-based matchmaking and a server-authoritative rules engine. Turn order, card legality and 108-card deck integrity are all validated on the server, so forged moves never reach the table.',
-    role: 'Backend & rules engine',
-    tech: ['TypeScript', 'Node.js', 'Express', 'PostgreSQL', 'Flutter', 'Render'],
+      'A real-time game server with rooms, matchmaking and a server-authoritative rules engine. Turn order, card legality and the 108-card deck are validated on the server, so forged moves never reach the table.',
+    /** The CV's bullets for this project all describe the server, so that is the role. */
+    role: 'Game server, rules engine & rankings',
+    tech: ['Node.js', 'TypeScript', 'Express.js', 'PostgreSQL', 'Flutter', 'Render'],
     highlights: [
-      'Rooms for up to eight players, with share codes and friend invites',
-      'Server-side validation of turn order, card legality and deck integrity',
-      'Rules engine supporting official rules plus six variants',
-      'Rating-based matchmaking queues and level progression',
+      'Real-time game server with rooms, matchmaking, and up to 8 players per table',
+      'Server-side validation of turn order, card legality and 108-card deck integrity, to prevent forged moves',
+      'Rules engine supporting the official rules plus six optional house-rule variants for private rooms',
+      'Rating-based matchmaking queues, private rooms with share codes, and friend invites',
+      'Player ranking system with level progression and rank comparison',
     ],
     stats: [
       { value: '8', label: 'players per table' },
-      { value: '108', label: 'validated deck' },
+      { value: '108', label: 'card deck validated' },
       { value: '6', label: 'house-rule variants' },
     ],
     links: {
       github: 'https://github.com/SangamSitapuri07/Nuno_Backend',
-      live: null,
-      extra: {
-        label: 'Game client',
-        href: 'https://github.com/SangamSitapuri07/nuno',
-      },
+      /* The CV's "Live Demo" for Nuno is a demonstration video. */
+      live: 'https://drive.google.com/file/d/18CvfcClqI6hI97C6cGeu4zrXlPbNsG-s/view?usp=sharing',
     },
     screen: { mode: 'terminal', accent: '#54E0A0' },
     cover: { from: '#0A1F1A', via: '#0E3B2E', to: '#05060A', mark: 'NUNO' },
@@ -84,30 +54,31 @@ export const projects = [
 
   {
     id: 'ai-debate-coach',
-    index: '03',
+    index: '02',
     name: 'AI Debate Coach',
-    subtitle: 'Debate practice in a 3D arena',
+    subtitle: '3D AI debate platform',
     year: '2026',
-    tagline: 'Argue against an AI opponent — then read exactly why you lost.',
+    tagline: 'Practise a debate against an AI opponent inside a live 3D arena.',
     summary:
-      'A round-based debate platform with a live 3D battle arena built in React Three Fiber. It generates structured arguments, helps you dismantle the other side, then scores your delivery across clarity, logic, evidence and impact.',
-    role: 'AI integration & backend (team of three)',
-    tech: ['React', 'Three.js', 'React Three Fiber', 'Node.js', 'Express', 'Gemini', 'Groq'],
+      'A 3D AI debate platform built on a live React Three Fiber arena, with argument generation and counter-argument building, and a feedback scorecard that measures clarity, logic, evidence and impact.',
+    role: 'AI integration & backend, with two teammates',
+    tech: ['React', 'Three.js', 'Node.js', 'Express.js', 'Gemini API', 'Groq API'],
     highlights: [
-      'Live 3D battle arena rendered with React Three Fiber',
-      'Argument generator: claim, reasoning, evidence, impact',
-      'Counterargument builder targeting weak logic',
-      'Scorecard scoring clarity, logic, evidence and impact',
-      'Switchable models — Gemini 2.0 Flash and Groq (Llama 3 / Mixtral)',
+      'Engineered a 3D AI debate platform with a live React Three Fiber arena',
+      'Implemented argument generation and counter-argument building for interactive debate sessions',
+      'Established a feedback scorecard measuring clarity, logic, evidence and impact of arguments',
+      'Integrated Gemini and Groq AI models with a Node.js/Express backend for AI responses',
+      'Coordinated with two teammates while handling AI integration and backend development',
     ],
     stats: [
-      { value: '4', label: 'score dimensions' },
-      { value: '2', label: 'AI providers' },
-      { value: '3D', label: 'battle arena' },
+      { value: '4', label: 'scorecard dimensions' },
+      { value: '2', label: 'AI models integrated' },
+      { value: '3D', label: 'debate arena' },
     ],
     links: {
       github: 'https://github.com/SangamSitapuri07/AI-Debate_Coach',
-      live: null,
+      /* The CV's "Live Demo" for this one is a deployed web app. */
+      live: 'https://debate-coach.netlify.app/',
     },
     screen: { mode: 'arena', accent: '#FF8A3D' },
     cover: { from: '#2A1005', via: '#4A1D08', to: '#05060A', mark: 'DEBATE' },
@@ -115,97 +86,35 @@ export const projects = [
 
   {
     id: 'news-pinch',
-    index: '04',
+    index: '03',
     name: 'News Pinch',
     subtitle: 'Android news, polls & video posts',
-    year: '2026',
-    tagline: 'A news app that publishes itself — articles, polls and video, no news API.',
+    year: 'Mar 2026',
+    tagline: 'A news app that publishes itself — articles, polls and video, without a news API.',
     summary:
-      'An Android app where both readers and administrators contribute content. Video works by linking YouTube rather than paying for a news API, which kept the whole publishing pipeline lightweight enough to ship and maintain alone.',
+      'An Android news application supporting articles, polls and video-based posts, where both users and administrators contribute content. Video works through YouTube links rather than an external news API, which keeps the publishing model simple.',
     role: 'Android development',
-    tech: ['Kotlin', 'Android', 'Material UI', 'YouTube embeds'],
+    tech: ['Kotlin', 'Android'],
     highlights: [
-      'Content model covering articles, polls and video posts',
-      'User contributions and an admin publishing flow',
-      'Video content delivered through YouTube links — no external news API',
-      'Lightweight reading experience on low-end devices',
+      'An Android news application supporting articles, polls and video-based posts',
+      'A simple content model for efficient article, poll and video publishing',
+      'User and administrator contributions for managing application content',
+      'YouTube links for video content, without using an external news API',
+      'A lightweight, user-friendly Android publishing interface',
     ],
     stats: [
       { value: '3', label: 'content types' },
-      { value: '0', label: 'news APIs needed' },
+      { value: '0', label: 'external news APIs' },
+      { value: 'Kotlin', label: 'native Android' },
     ],
     links: {
       github: 'https://github.com/SangamSitapuri07/News-Pinch',
-      live: null,
+      /* The CV's "Live Demo" for the Android app is a demonstration video. */
+      live: 'https://drive.google.com/file/d/1i5czKpk2k_Pkq38Buh9PpnFJIZ5UEWsr/view?usp=sharing',
     },
     screen: { mode: 'mobile', accent: '#4B8CFF' },
     cover: { from: '#0A1030', via: '#152056', to: '#05060A', mark: 'PINCH' },
   },
-
-  {
-    id: 'portfolio',
-    index: '05',
-    name: 'This portfolio',
-    subtitle: 'The page you are inside right now',
-    year: '2026',
-    tagline: 'One scroll timeline drives a real 3D laptop, camera and every word on screen.',
-    summary:
-      'A single master timeline maps scroll progress onto camera keyframes, the laptop hinge, the screen contents and the text overlays — so scrolling up plays the entire film backwards, exactly.',
-    role: 'Design & engineering',
-    tech: ['React', 'Vite', 'Three.js', 'React Three Fiber', 'GSAP ScrollTrigger', 'Lenis', 'Tailwind'],
-    highlights: [
-      'Scroll progress drives camera, hinge, screen and text',
-      'A scanned laptop model rigged with a real hinge pivot, not a fake rotation',
-      'Screen interfaces drawn to canvas, swapped per section',
-      'Quality tiers, reduced motion and an HTML fallback',
-    ],
-    stats: [
-      { value: '1', label: 'scroll timeline' },
-      { value: '7', label: 'scenes' },
-      { value: '60', label: 'fps target' },
-    ],
-    links: {
-      github: 'https://github.com/SangamSitapuri07/sangam-portfolio',
-      live: 'https://sangam-portfolio-roan.vercel.app',
-    },
-    screen: { mode: 'editor', accent: '#7C5CFF' },
-    cover: { from: '#160B2E', via: '#271349', to: '#05060A', mark: 'SS' },
-  },
 ]
-
-/**
- * Smaller repositories, shown as a compact list — real links, no cards.
- * Keeps the Projects scene focused on five stories instead of a wall of tiles.
- */
-export const moreOnGitHub = [
-  {
-    name: 'Café Billing',
-    description: 'Billing app for a small café — Kotlin, Android',
-    href: 'https://github.com/SangamSitapuri07/Cafe-Billing',
-  },
-  {
-    name: 'Fault-Tolerant DFS',
-    description: 'Distributed file system with replication — TypeScript',
-    href: 'https://github.com/SangamSitapuri07/build-fault-tolerant-dfs',
-  },
-  {
-    name: 'Dot & Connect',
-    description: 'Real-time multiplayer dots game — JavaScript',
-    href: 'https://github.com/SangamSitapuri07/Dot-and-Connect',
-  },
-  {
-    name: 'Dynamic Memory Visualizer',
-    description: 'Visualises allocation and fragmentation — JavaScript',
-    href: 'https://github.com/SangamSitapuri07/dynamic-memory-visualizer',
-  },
-  {
-    name: 'Innovators',
-    description: 'Team site, live on Vercel — HTML',
-    href: 'https://github.com/SangamSitapuri07/innovators',
-  },
-]
-
-/** Convenience: project lookup by id (used by the screen-texture system). */
-export const getProjectById = (id) => projects.find((project) => project.id === id)
 
 export default projects

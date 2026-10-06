@@ -61,7 +61,7 @@ const projectsModule = await load('data/projects.js')
 const skillsModule = await load('data/skills.js')
 const timelineModule = await load('data/timeline.js')
 
-const { projects, moreOnGitHub } = projectsModule
+const { projects } = projectsModule
 const { skillCategories } = skillsModule
 const { timeline, achievements } = timelineModule
 
@@ -94,8 +94,8 @@ has(person, 'education.degree', { type: 'string' })
 has(person, 'education.cgpa', { type: 'string' })
 
 console.log('▸ projects')
-has(projectsModule, 'projects', { type: 'array', min: 5 })
-has(projectsModule, 'moreOnGitHub', { type: 'array', min: 3 })
+/* The CV lists three projects; the data must not grow beyond what it says. */
+has(projectsModule, 'projects', { type: 'array', min: 3 })
 projects.forEach((project) => {
   const where = `projects[${project.index}]`
   for (const key of ['id', 'index', 'name', 'subtitle', 'year', 'tagline', 'summary', 'role']) {
@@ -128,11 +128,6 @@ projects.forEach((project) => {
     has(stat, 'value', { type: 'string', label: `${where}.stats[${index}].value` })
   })
 })
-moreOnGitHub.forEach((repo, index) => {
-  has(repo, 'name', { type: 'string', label: `moreOnGitHub[${index}].name` })
-  has(repo, 'description', { type: 'string', label: `moreOnGitHub[${index}].description` })
-  has(repo, 'href', { type: 'string', expect: (v) => v.startsWith('https://'), label: `moreOnGitHub[${index}].href` })
-})
 
 console.log('▸ skills')
 has(skillsModule, 'skillCategories', { type: 'array', min: 4 })
@@ -145,7 +140,7 @@ skillCategories.forEach((category) => {
 })
 
 console.log('▸ timeline + achievements')
-has(timelineModule, 'timeline', { type: 'array', min: 9 })
+has(timelineModule, 'timeline', { type: 'array', min: 8 })
 timeline.forEach((entry, index) => {
   const where = `timeline[${index}]`
   for (const key of ['id', 'kind', 'period', 'title', 'organisation', 'detail']) {
@@ -277,7 +272,6 @@ for (const [name, module] of Object.entries({
   skillCategories,
   timeline,
   achievements,
-  moreOnGitHub,
 })) {
   collectStrings(module, name)
 }

@@ -24,7 +24,9 @@ export const profile = {
 
   /** One-line status, shown as a small pill in the hero */
   status: 'Open to internships & freelance work',
-  currently: 'Shipping ORCA for the Smart India Hackathon (ISRO problem statement)',
+  /* No `currently` line: the CV does not state what is in progress, and the thing
+     that used to be here came from a repository README, not from him. */
+  currently: null,
 
   location: {
     city: 'Phagwara, Punjab',
@@ -63,7 +65,7 @@ export const profile = {
   facts: [
     { value: '8.52', label: 'CGPA' },
     { value: '200+', label: 'DSA problems solved' },
-    { value: '5', label: 'Shipped projects' },
+    { value: '3', label: 'Projects on the CV' },
     { value: '4★', label: 'HackerRank Python' },
   ],
 
@@ -83,7 +85,7 @@ export const profile = {
       },
       {
         title: 'Android',
-        detail: 'Kotlin and Java apps with Firebase — built and released end to end.',
+        detail: 'Kotlin and Java, from a news app with articles, polls and video posts.',
       },
       {
         title: 'Interests',

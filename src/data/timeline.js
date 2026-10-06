@@ -1,24 +1,13 @@
 /**
- * Timeline — certifications, training, hackathons, achievements and education.
- * Sourced from SangamCV.pdf (certificates, training, achievements, education)
- * and the public repos (Smart India Hackathon / ORCA).
+ * Timeline — certifications, training, achievements and education, exactly as the
+ * CV lists them. There is no hackathon entry: the CV names none, and the one that
+ * used to be here came from a repository README rather than from him.
  *
  * Newest first, because the scroll travels forward in time.
  * `kind` drives the small marker icon and colour on the rail.
  */
 
 export const timeline = [
-  {
-    id: 'sih-orca',
-    kind: 'hackathon',
-    period: '2026',
-    title: 'Smart India Hackathon — ISRO problem statement',
-    organisation: 'Team ORCA',
-    detail:
-      'Built the data and reasoning engine for a marine advisory tool: twelve live ocean sources, a ten-agent pipeline, and routes verified against the GLOBE land mask.',
-    tags: ['Python', 'FastAPI', 'Multi-agent'],
-    link: { label: 'ORCA-backend', href: 'https://github.com/SangamSitapuri07/ORCA-backend' },
-  },
   {
     id: 'oci-ai',
     kind: 'certification',
