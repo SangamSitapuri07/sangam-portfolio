@@ -41,7 +41,9 @@ export default function About() {
         <ul className="space-y-1.5">
           {profile.about.footer.map((line) => (
             <li key={line} className="flex items-baseline gap-2 text-xs text-ink-faint">
-              <span aria-hidden="true" className="text-accent/60">
+              {/* The list marker. At 60% alpha it measured 2.8:1; the accent at
+                  full strength is 5.6:1 against a card. */}
+              <span aria-hidden="true" className="text-accent">
                 —
               </span>
               {line}

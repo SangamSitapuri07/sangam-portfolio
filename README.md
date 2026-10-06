@@ -78,7 +78,7 @@ canvas.
 ## Checks
 
 ```bash
-npm run verify     # everything below, ~12s
+npm run verify     # everything below, ~10s
 npm run lint       # eslint, no errors
 ```
 
@@ -88,6 +88,8 @@ npm run lint       # eslint, no errors
 | `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that no wide shot parks the machine under the copy column |
 | `verify:dom` | Boots the app in jsdom: zero console errors, one `h1`, working fallback links |
 | `verify:screens` | Paints every screen at every quality tier: correct copy, not blank, no overlapping text, no text off the panel, no glyph outside the font |
+| `verify:film` | Runs the real director against the real rig: the storyboard is a pure function of progress, scrubbing backwards lands on the same pose, the camera never jump-cuts, the display changes panel only on its boundary, and no React state is written from a frame callback |
+| `verify:a11y` | Computes WCAG contrast from the tokens and the utilities actually used, and checks heading order, tabindex, alt text, button names and reduced motion |
 
 `verify:screens` writes previews to `.qa/screens/` (git-ignored) so the panels can
 be looked at without a browser.

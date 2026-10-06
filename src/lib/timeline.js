@@ -276,7 +276,11 @@ export function buildScreenStates({ projectList = projects } = {}) {
     }
 
     states.push({
-      from: range.from + range.span * 0.04,
+      /* Each panel takes over a little way into its scene, so the copy is already
+         moving when the display changes. The first scene has nothing before it to
+         wait for, so its panel is live from progress 0 — which is what
+         getScreenState() already returns for the opening stretch. */
+      from: range.from === 0 ? 0 : range.from + range.span * 0.04,
       key: scene.screen.section,
       section: scene.screen.section,
       projectIndex: -1,

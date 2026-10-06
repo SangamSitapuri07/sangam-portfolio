@@ -11,12 +11,14 @@
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{js,jsx,css,json}\"",
     "model:optimize": "node tools/optimize-model.mjs",
-    "verify:rig": "node tools/verify-rig.mjs",
     "og": "node tools/generate-og.mjs",
+    "verify": "npm run verify:content && npm run verify:rig && npm run verify:dom && npm run verify:screens && npm run verify:film && npm run verify:a11y",
     "verify:content": "node tools/verify-content.mjs",
-    "verify": "npm run verify:content && npm run verify:rig && npm run verify:dom && npm run verify:screens",
+    "verify:rig": "node tools/verify-rig.mjs",
     "verify:dom": "node tools/verify-dom.mjs",
-    "verify:screens": "node tools/verify-screens.mjs"
+    "verify:screens": "node tools/verify-screens.mjs",
+    "verify:film": "node tools/verify-film.mjs",
+    "verify:a11y": "node tools/verify-a11y.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

@@ -161,7 +161,8 @@ export function Stat({ value, label, detail }) {
         {value}
       </div>
       <div className="mt-0.5 text-xs text-ink-faint">{label}</div>
-      {detail ? <div className="mt-0.5 text-[0.6875rem] text-ink-faint/70">{detail}</div> : null}
+      {/* Full-strength faint ink: at 70% alpha this line measured 2.4:1. */}
+      {detail ? <div className="mt-0.5 text-[0.6875rem] text-ink-faint">{detail}</div> : null}
     </div>
   )
 }

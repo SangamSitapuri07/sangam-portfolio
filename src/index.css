@@ -33,7 +33,10 @@
   /* Ink */
   --color-ink: #eef2f9;
   --color-ink-soft: #9ba5b7;
-  --color-ink-faint: #667082;
+  /* The dimmest ink still clears WCAG AA (4.5:1) on every surface it is painted
+     on — including surface-3, the lightest of them. #667082 looked right on a
+     good monitor and measured 3.4:1, which is unreadable in daylight. */
+  --color-ink-faint: #858d9b;
 
   /* Accent — electric blue */
   --color-accent: #4b8cff;
