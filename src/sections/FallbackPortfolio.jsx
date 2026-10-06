@@ -1,5 +1,7 @@
 import { profile } from '@/data/profile'
 import { projects } from '@/data/projects'
+import { demos } from '@/config/demos'
+import { requestDemo } from '@/lib/uiBus'
 import { skillCategories } from '@/data/skills'
 import { timeline, achievements } from '@/data/timeline'
 import { Button, Card, Chip, SectionHeading } from '@/components/ui'
@@ -93,7 +95,20 @@ export default function FallbackPortfolio() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-4 flex flex-wrap gap-4 text-sm">
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+                  {demos[project.id] ? (
+                    <button
+                      type="button"
+                      onClick={() => requestDemo(project.id)}
+                      className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 font-medium text-accent-bright transition-colors hover:border-accent/70 hover:bg-accent/20"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3 fill-current">
+                        <path d="M3 1.5v9l7.5-4.5z" />
+                      </svg>
+                      Run demo
+                    </button>
+                  ) : null}
+
                   <a
                     href={project.links.github}
                     className="text-accent hover:text-accent-bright"

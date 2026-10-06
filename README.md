@@ -84,7 +84,7 @@ npm run lint       # eslint, no errors
 
 | Command | What it proves |
 | --- | --- |
-| `verify:content` | 427 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
+| `verify:content` | 444 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
 | `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that no wide shot parks the machine under the copy column |
 | `verify:dom` | Boots the app in jsdom: zero console errors, one `h1`, working fallback links |
 | `verify:screens` | Paints every screen at every quality tier: correct copy, not blank, no overlapping text, no text off the panel, no glyph outside the font |
@@ -97,6 +97,28 @@ be looked at without a browser.
 None of this watches the film animate, measures a real frame rate, or hears a
 screen reader — that pass needs a browser and is written up as a checklist in
 [`docs/QA-CHECKLIST.md`](docs/QA-CHECKLIST.md), in priority order.
+
+## Running the projects
+
+Each project has a **Run demo** action, in the project card and by clicking the
+laptop's display while that project is on screen. The demo environment frames each
+one the way it should be framed — a browser for a web app, a phone for an app you
+hold — runs what can genuinely run, and says so when something cannot: a native
+Android app has no way to execute in a browser, so News Pinch plays the CV's
+recording and states the limitation rather than dressing it up.
+
+Drop a web build of your own into `public/demos/<id>/` and the lab runs the real
+thing instead. [`docs/DEMO-LAB.md`](docs/DEMO-LAB.md) has the steps, including why
+a Flutter client can be made to run in a browser and a Kotlin app cannot.
+
+## Direct manipulation
+
+The machine is not just animated at you. Drag it with a pointer or a finger and it
+turns; leave it alone and it drifts, slowly, so it never looks like a still. Both
+are *offsets* on the storyboard, never replacements — a drag is excluded from the
+camera anchors, so you turn the object rather than the viewpoint, and releasing
+lets it settle back to the angle the scene was composed for. `verify:film` asserts
+all of it, including that a drag cannot move the camera by even a float.
 
 ## Assets
 

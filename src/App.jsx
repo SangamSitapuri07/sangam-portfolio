@@ -10,10 +10,20 @@ import ScrollHint from '@/components/ScrollHint'
 import SectionOverlay from '@/components/SectionOverlay'
 import FallbackPortfolio from '@/sections/FallbackPortfolio'
 import SceneBoundary from '@/components/SceneBoundary'
+import DemoLab from '@/components/DemoLab'
 
 import { detectDevice, probeWebGL, resolveDpr, tierDown } from '@/lib/device'
-import { initScrollEngine, onSceneChange, startScroll, stopScroll, sceneState } from '@/lib/scrollEngine'
-import { sceneRanges } from '@/lib/timeline'
+import { onDemoRequest } from '@/lib/uiBus'
+import {
+  initScrollEngine,
+  onProgress,
+  onSceneChange,
+  startScroll,
+  stopScroll,
+  sceneState,
+} from '@/lib/scrollEngine'
+import { getScreenState, sceneRanges } from '@/lib/timeline'
+import { projects } from '@/data/projects'
 import { autoTune } from '@/config/quality'
 
 /**
@@ -41,6 +51,12 @@ export default function App() {
   const [loaderDone, setLoaderDone] = useState(false)
   const [activeSceneId, setActiveSceneId] = useState('home')
   const [variant, setVariant] = useState(device.variant)
+  /* Which project's demo environment is open, if any. Set from a click on a
+     project card or from a click on the laptop's display in the 3D scene. */
+  const [demoProjectId, setDemoProjectId] = useState(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('demo')
+  })
 
   const tierDropped = useRef(false)
   const useStatic = forcedStatic || sceneCrashed || !webgl.ok
@@ -64,6 +80,29 @@ export default function App() {
     if (!changed || !useStatic) return
     document.getElementById(activeSceneId)?.scrollIntoView({ block: 'start' })
   }, [useStatic, activeSceneId])
+
+  /* True while the pointer is over the laptop display, which turns the cursor
+     into an invitation to click. Fires on enter and leave only — never per
+     frame — so it is safe to keep in React state. */
+  const [screenHovered, setScreenHovered] = useState(false)
+
+  /* Which project the display is showing, so the click hint can name it. This
+     runs on every scroll tick, but it returns the previous object whenever the
+     project has not changed, so React bails out and nothing re-renders. */
+  const [currentProject, setCurrentProject] = useState(null)
+  useEffect(() => {
+    if (!ready || useStatic) return undefined
+    return onProgress((progress) => {
+      const id = getScreenState(progress).projectId
+      setCurrentProject((previous) => {
+        if (previous?.id === id) return previous
+        return projects.find((project) => project.id === id) ?? null
+      })
+    })
+  }, [ready, useStatic])
+
+  /* ---- Clicks that start in the 3D scene arrive here ---- */
+  useEffect(() => onDemoRequest((projectId) => setDemoProjectId(projectId)), [])
 
   /* ---- Keep the layout variant honest across resizes ---- */
   useEffect(() => {
@@ -160,6 +199,7 @@ export default function App() {
                 reducedMotion={device.reducedMotion}
                 onSceneReady={handleSceneReady}
                 onPerformanceDrop={handlePerformanceDrop}
+                onHoverChange={setScreenHovered}
               />
             </Canvas>
           </SceneBoundary>
@@ -201,6 +241,24 @@ export default function App() {
       {!useStatic ? <SectionOverlay /> : null}
 
       {!useStatic ? <Loader onComplete={() => setLoaderDone(true)} /> : null}
+
+      {/* Discoverability: a clickable display nobody knows is clickable is not an
+          interaction. Appears only while the pointer is actually on the panel. */}
+      {screenHovered && !demoProjectId ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-4"
+        >
+          <span className="rounded-full border border-accent/40 bg-void/85 px-4 py-2 text-[0.75rem] font-medium text-accent-bright backdrop-blur-md">
+            {currentProject
+              ? `Click the display to run ${currentProject.name}`
+              : 'Click the display'}
+          </span>
+        </div>
+      ) : null}
+
+      {/* The demo environment sits above everything, film or plain page. */}
+      <DemoLab projectId={demoProjectId} onClose={() => setDemoProjectId(null)} />
     </>
   )
 }

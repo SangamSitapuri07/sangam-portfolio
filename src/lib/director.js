@@ -20,6 +20,7 @@ import * as THREE from 'three'
 import { damping as dampingConfig, reducedMotion as rmConfig } from '@/config/animation'
 import { parallax as parallaxConfig } from '@/config/laptop'
 import { defaultAnchors } from '@/lib/anchors'
+import { interaction } from '@/lib/interaction'
 import { buildKeyframes, findSegment, resolveCameraAt, getScreenState } from '@/lib/timeline'
 
 const ANCHOR_KEYS = Object.keys(defaultAnchors)
@@ -155,6 +156,21 @@ export function createDirector({
 
       /* ---- 4. World-space anchors ---- */
       measureWorldAnchors()
+
+      /* ---- 4b. Direct manipulation ----
+       * Applied AFTER the anchors are measured, and deliberately excluded from
+       * `anchorMatrix`. The camera aims at anchors, so feeding a drag into them
+       * would swing the camera with the machine and the whole frame would rotate —
+       * the visitor would be turning the camera, not the object. Read here, the
+       * drag turns the machine and the camera stays composed on the storyboard,
+       * which is also what keeps every keyframe framed the way it was verified. */
+      if (rig) {
+        const m = rig.machine
+        m.rotation.x += interaction.pitch + interaction.driftPitch
+        m.rotation.y += interaction.yaw + interaction.driftYaw
+        m.position.y += interaction.bob
+        m.updateMatrixWorld(true)
+      }
 
       /* ---- 5. Camera ---- */
       resolveCameraAt(a, film.worldAnchors, camA)

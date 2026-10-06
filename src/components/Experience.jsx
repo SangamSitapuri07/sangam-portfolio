@@ -2,6 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 
 import CameraRig from '@/components/CameraRig'
+import Interactions from '@/components/Interactions'
 import Laptop from '@/components/Laptop'
 import Studio from '@/components/Studio'
 import Effects from '@/components/Effects'
@@ -20,6 +21,7 @@ export default function Experience({
   reducedMotion,
   onSceneReady,
   onPerformanceDrop,
+  onHoverChange,
 }) {
   const gl = useThree((state) => state.gl)
   const refs = useRef({ rig: null, lights: null, loaderProgress: 1, film: null })
@@ -66,6 +68,10 @@ export default function Experience({
       />
 
       <Studio quality={quality} registerLights={registerLights} />
+
+      {/* Drag, hover and click live here: they need the canvas element and the
+          shared refs, and they must not re-render anything while they work. */}
+      <Interactions refs={refs} reducedMotion={reducedMotion} onHoverChange={onHoverChange} />
 
       <Suspense fallback={null}>
         <Laptop quality={quality} onRig={handleRig} />

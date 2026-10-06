@@ -41,7 +41,7 @@ export default function ScrollHint({ ready }) {
           onClick={() => scrollToSection('home')}
           className="group flex flex-col items-center gap-2.5 rounded-2xl px-4 py-2 text-[0.6875rem] tracking-[0.24em] text-ink-faint uppercase transition-colors hover:text-ink-soft"
         >
-          <span>Scroll to explore</span>
+          <span>Scroll to explore · drag to turn</span>
           <span aria-hidden="true" className="relative block h-8 w-px overflow-hidden bg-line">
             <span className="absolute inset-x-0 top-0 h-3 animate-[scrollcueline_2.2s_var(--ease-in-out-soft)_infinite] bg-accent" />
           </span>

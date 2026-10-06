@@ -158,6 +158,7 @@ achievements.forEach((item, index) => {
 has(timelineModule, 'education', { type: 'object' })
 
 /* ---------------------------------------------------------- config values */
+const demos = await load('config/demos.js')
 const animation = await load('config/animation.js')
 const quality = await load('config/quality.js')
 const laptop = await load('config/laptop.js')
@@ -177,6 +178,49 @@ has(quality, 'autoTune.slowFrameMs', { type: 'number', expect: (v) => v > 16 })
 has(quality, 'dprCeiling.mobile', { type: 'number', expect: (v) => v <= 1.5 })
 has(quality, 'dprCeiling.desktop', { type: 'number', expect: (v) => v <= 2 })
 for (const tier of ['high', 'medium', 'low']) has(quality, `tiers.${tier}`, { type: 'object' })
+
+console.log('▸ demo environment')
+
+/* Every project the CV gives a Live Demo must have somewhere to run it, and the
+   demo must point at that same CV link — not at something invented for the
+   portfolio. A project with no demo entry is a silent dead end in the UI. */
+projects.forEach((project) => {
+  has(demos, `demos.${project.id}`, { type: 'object', label: `demos.${project.id}` })
+  has(demos.demos[project.id] ?? {}, 'src', { type: 'string', label: `demos.${project.id}.src` })
+  has(demos.demos[project.id] ?? {}, 'frame', {
+    type: 'string',
+    expect: (v) => ['phone', 'browser'].includes(v),
+    label: `demos.${project.id}.frame`,
+  })
+  has(demos.demos[project.id] ?? {}, 'badge', { type: 'string', label: `demos.${project.id}.badge` })
+})
+
+let demoMismatch = []
+let demoRunnable = 0
+for (const project of projects) {
+  const demo = demos.demos[project.id]
+  if (!demo) continue
+  checks += 1
+  /* The frame is decided by whether the thing is held in a hand. */
+  const expectsPhone = ['mobile', 'terminal'].includes(project.screen?.mode) && project.id !== 'nuno'
+  if (expectsPhone && demo.frame !== 'phone') demoMismatch.push(`${project.id}: frame ${demo.frame}`)
+  if (demo.runnable) demoRunnable += 1
+  /* An entry that claims the real app is running must not be a recording. */
+  if (demo.kind === 'web' && demo.badge.toLowerCase().includes('recorded')) {
+    demoMismatch.push(`${project.id}: a web demo labelled as a recording`)
+  }
+  /* Anything that cannot run in a browser must say why, in words. */
+  if (!demo.runnable && demo.runtime === 'android' && !demo.limitation) {
+    demoMismatch.push(`${project.id}: native Android with no stated limitation`)
+  }
+}
+checks += 1
+if (demoMismatch.length) failures.push(`demo environment: ${demoMismatch.join(', ')}`)
+
+/* At least one project must genuinely run here, or "run my projects" is a claim
+   with nothing behind it. */
+checks += 1
+if (demoRunnable === 0) failures.push('demo environment: no project can actually run')
 
 console.log('▸ laptop rig config')
 for (const key of ['y', 'z', 'closedAngle', 'openAngle', 'liftSettle']) {

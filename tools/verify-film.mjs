@@ -350,6 +350,100 @@ try {
     `(p95 ${p95.toFixed(3)} ms of a 16.7 ms frame; headless Node, so an upper bound)`
   )
 
+  /* ------------------------------------------------------- direct manipulation
+   * Dragging the machine must turn the machine, not the camera. If a drag ever
+   * leaks into the anchors the camera aims at, the whole frame swings and the
+   * visitor is rotating the viewpoint instead of the object.
+   */
+  console.log('\n▸ dragging turns the machine, not the camera')
+
+  let drag = { yaw: 0, pitch: 0, driftYaw: 0, driftPitch: 0, bob: 0, dragging: false, hoveringScreen: false, idleWeight: 0, sinceInput: 0, reducedMotion: false, targetYaw: 0, targetPitch: 0 }
+  let interactionModule = null
+  try {
+    interactionModule = await server.ssrLoadModule('/src/lib/interaction.js')
+    drag = interactionModule.interaction
+  } catch (error) {
+    check('the interaction module loads', false, String(error))
+  }
+  check('the interaction module loads', Boolean(interactionModule))
+
+  const posed = (mutate) => {
+    const sceneState = { smoothProgress: 0.42, pointerSmooth: { x: 0, y: 0 } }
+    const director = makeFilm(sceneState)
+    const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.1, 100)
+    director.register({ camera, rig, lights: null })
+    for (let i = 0; i < 240; i += 1) director.update(DT)
+    mutate()
+    director.update(DT)
+    return {
+      rotation: rig.machine.rotation.toArray().slice(0, 3),
+      camera: camera.position.toArray(),
+      target: director.film.perspective.target.toArray(),
+    }
+  }
+
+  const atRest = posed(() => {
+    drag.yaw = 0
+    drag.pitch = 0
+    drag.driftYaw = 0
+    drag.driftPitch = 0
+    drag.bob = 0
+  })
+
+  const dragged = posed(() => {
+    drag.yaw = 0.6
+    drag.pitch = 0.2
+    drag.driftYaw = 0
+    drag.driftPitch = 0
+    drag.bob = 0
+  })
+
+  const turned = dragged.rotation[1] - atRest.rotation[1]
+  check('a drag turns the machine', Math.abs(turned) > 0.5, `(yaw ${turned.toFixed(2)} rad)`)
+  check(
+    'a drag leaves the camera exactly where the storyboard put it',
+    dragged.camera.every((value, i) => Math.abs(value - atRest.camera[i]) < 1e-6),
+    `(camera moved ${Math.max(...dragged.camera.map((v, i) => Math.abs(v - atRest.camera[i]))).toExponential(1)})`
+  )
+  check(
+    'a drag leaves the camera target on the anchor',
+    dragged.target.every((value, i) => Math.abs(value - atRest.target[i]) < 1e-6)
+  )
+
+  /* Drift is what stops the machine looking frozen. It must be present when idle
+     and absent under reduced motion. */
+  /* Nothing has happened for a while: the frame clock says so. */
+  drag.sinceInput = 10
+  for (let i = 0; i < 180; i += 1) {
+    drag.sinceInput = 10
+    interactionModule.updateInteraction(DT, i * DT)
+  }
+  check(
+    'an idle machine drifts instead of freezing',
+    Math.abs(drag.driftYaw) > 1e-4 || Math.abs(drag.bob) > 1e-4,
+    `(drift yaw ${drag.driftYaw.toFixed(4)}, bob ${drag.bob.toFixed(4)})`
+  )
+  check('the drift stays subtle rather than accumulating', Math.abs(drag.driftYaw) <= 0.05)
+  /* ...and it gets out of the way the moment the visitor moves again. */
+  drag.sinceInput = 0
+  for (let i = 0; i < 60; i += 1) {
+    drag.sinceInput = 0
+    interactionModule.updateInteraction(DT, 4 + i * DT)
+  }
+  check(
+    'touching the page stops the drift',
+    drag.idleWeight === 0 && Math.abs(drag.bob) < 1e-6,
+    `(idle weight ${drag.idleWeight.toFixed(2)})`
+  )
+
+  drag.reducedMotion = true
+  interactionModule.updateInteraction(DT, 4)
+  check(
+    'reduced motion removes the drag and the drift entirely',
+    drag.yaw === 0 && drag.driftYaw === 0 && drag.bob === 0
+  )
+  drag.reducedMotion = false
+
   /* ------------------------------------------------------------------ 6. the rule
    * "No per-frame React state" is an architectural constraint, and the cheapest
    * way to enforce it is to look for the violation in the source.
