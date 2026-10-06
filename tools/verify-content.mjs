@@ -313,13 +313,25 @@ for (const file of await walk(srcDir)) {
  * count nobody re-reads goes stale, so the suite reads its own documentation.
  */
 const total = checks + swept + 1
-const readmeQuote = await readFile(path.join(root, 'README.md'), 'utf8')
-  .then((text) => text.match(/`verify:content`\s*\|\s*(\d[\d,]*)\s+assertions/))
-  .catch(() => null)
-if (!readmeQuote) {
-  failures.push('README.md no longer quotes how many assertions this suite makes')
-} else if (Number(readmeQuote[1].replace(/,/g, '')) !== total) {
-  failures.push(`README.md says ${readmeQuote[1]} assertions; this suite makes ${total}`)
+
+/* Every document that quotes this suite's size is checked, so none of them can
+   quietly go stale — the README did, which is why this guard exists. */
+const QUOTING_DOCS = [
+  ['README.md', /`verify:content`\s*\|\s*(\d[\d,]*)\s+assertions/],
+  /* Flexible whitespace: markdown wraps, and the first version of this pattern
+     missed a phrase split across a line break — the guard has to be as forgiving
+     as the prose it reads. */
+  ['docs/QA-CHECKLIST.md', /(\d[\d,]*)\s+content\s+assertions/i],
+]
+for (const [doc, pattern] of QUOTING_DOCS) {
+  const quote = await readFile(path.join(root, doc), 'utf8')
+    .then((text) => text.match(pattern))
+    .catch(() => null)
+  if (!quote) {
+    failures.push(`${doc} no longer quotes how many assertions this suite makes`)
+  } else if (Number(quote[1].replace(/,/g, '')) !== total) {
+    failures.push(`${doc} says ${quote[1]} assertions; this suite makes ${total}`)
+  }
 }
 checks = total
 

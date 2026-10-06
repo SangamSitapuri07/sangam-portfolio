@@ -94,6 +94,10 @@ npm run lint       # eslint, no errors
 `verify:screens` writes previews to `.qa/screens/` (git-ignored) so the panels can
 be looked at without a browser.
 
+None of this watches the film animate, measures a real frame rate, or hears a
+screen reader — that pass needs a browser and is written up as a checklist in
+[`docs/QA-CHECKLIST.md`](docs/QA-CHECKLIST.md), in priority order.
+
 ## Assets
 
 - `public/models/cyberpunk_laptop.glb` — 3.07 MB, down from 8.33 MB via
