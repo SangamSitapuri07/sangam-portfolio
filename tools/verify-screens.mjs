@@ -143,6 +143,11 @@ const collisions = (threshold = 6) => {
   return found
 }
 
+/* Anything outside Inter's Latin subset falls back to whatever font the machine
+   happens to have — a different shape and different metrics on every system, which
+   is why stars and box-drawing bars are drawn as paths rather than typed. */
+const NOT_IN_INTER = /[\u2500-\u2bff\uff00-\uffef\u2190-\u21ff]/
+
 const problems = []
 const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? '✓' : '✗'} ${label}${detail ? `  ${detail}` : ''}`)
@@ -232,6 +237,13 @@ try {
         `(${colours} colours, ${(litFraction * 100).toFixed(1)}% lit)`
       )
       reports.push({ key, text: [...painted], colours })
+
+      const outsideFont = painted.filter((value) => NOT_IN_INTER.test(value))
+      check(
+        `“${key}” only draws glyphs the font covers`,
+        outsideFont.length === 0,
+        outsideFont.length ? `→ ${JSON.stringify(outsideFont[0])}` : ''
+      )
 
       const hits = collisions()
       check(

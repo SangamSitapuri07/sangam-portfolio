@@ -38,12 +38,21 @@ export default function App() {
   const [quality, setQuality] = useState(device.tier)
   const [forcedStatic, setForcedStatic] = useState(false)
   const [sceneCrashed, setSceneCrashed] = useState(false)
-  const [ready, setReady] = useState(false)
+  const [loaderDone, setLoaderDone] = useState(false)
   const [activeSceneId, setActiveSceneId] = useState('home')
   const [variant, setVariant] = useState(device.variant)
 
   const tierDropped = useRef(false)
   const useStatic = forcedStatic || sceneCrashed || !webgl.ok
+  /* Static mode has nothing to stream — no model, no textures — so the page is
+     ready as soon as it mounts. Without this the nav would wait on a loader that
+     is never rendered. Derived, not set from an effect: state set inside an
+     effect here would just cause a second render pass. */
+  const ready = loaderDone || useStatic
+
+  /* Falling back to the static page is not only for broken WebGL: a visitor on a
+     weak device can choose it, and the choice sticks for their whole session. */
+  const toggleStaticScene = useCallback(() => setForcedStatic((value) => !value), [])
 
   /* ---- Keep the layout variant honest across resizes ---- */
   useEffect(() => {
@@ -85,13 +94,6 @@ export default function App() {
       document.body.style.overflow = previous
     }
   }, [ready, useStatic])
-
-  /* Static mode has nothing to stream — no model, no textures — so the page is
-     ready as soon as it mounts. Without this the nav would wait on a loader that
-     is never rendered. */
-  useEffect(() => {
-    if (useStatic) setReady(true)
-  }, [useStatic])
 
   /* ---- One automatic quality step down if the first seconds are slow ---- */
   const handlePerformanceDrop = useCallback(() => {
@@ -168,7 +170,12 @@ export default function App() {
         />
       ) : null}
 
-      <Navbar activeSceneId={activeSceneId} ready={ready} staticMode={useStatic} />
+      <Navbar
+        activeSceneId={activeSceneId}
+        ready={ready}
+        staticMode={useStatic}
+        onToggleStatic={webgl.ok && !sceneCrashed ? toggleStaticScene : null}
+      />
 
       {!useStatic ? (
         <>
@@ -182,7 +189,7 @@ export default function App() {
           every heading (and the h1) for readers and crawlers alike. */}
       {!useStatic ? <SectionOverlay /> : null}
 
-      {!useStatic ? <Loader onComplete={() => setReady(true)} /> : null}
+      {!useStatic ? <Loader onComplete={() => setLoaderDone(true)} /> : null}
     </>
   )
 }

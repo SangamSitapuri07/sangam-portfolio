@@ -21,6 +21,7 @@
 import * as THREE from 'three'
 
 import { screens as screenConfig } from '@/config/laptop'
+import { scenes } from '@/config/scenes'
 import { screenTheme as theme } from '@/config/screen'
 import { profile } from '@/data/profile'
 import { projects } from '@/data/projects'
@@ -126,9 +127,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
 
   let currentKey = null
   let statusKey = null
-  let dirty = true
   let animationAccumulator = 0
-  const animationInterval = quality?.screenAnimation ? 1 / 7 : Infinity
 
   /* ---------------- Frame scaffolding ---------------- */
 
@@ -216,7 +215,48 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     ctx.globalAlpha = 1
   }
 
-  function drawFooter(ctx, left, right = '') {
+  /* The display is nearly square, so below the content there was a band of dead
+     space on every screen. The chapter rail fills it with something true: where
+     this scene sits in the film. It is read from the screen key, so it costs
+     nothing to keep in step. */
+  function drawFilmRail(ctx, key, accent) {
+    if (key === 'boot' || !key) return
+    const chapters = scenes.filter((scene) => scene.nav)
+    if (chapters.length < 2) return
+    const active = key.split(':')[0]
+    const railH = H * 0.078
+    const y = H - H * 0.058 - railH
+    const gutter = H * 0.04
+    const width = (W - gutter * 2) / chapters.length
+    ctx.fillStyle = theme.line
+    ctx.fillRect(gutter, y, W - gutter * 2, 1)
+    ctx.fillRect(gutter, y + railH * 0.88, W - gutter * 2, 1)
+    chapters.forEach((scene, index) => {
+      const x = gutter + index * width
+      const on = scene.id === active
+      if (index) {
+        ctx.fillStyle = theme.line
+        ctx.fillRect(x - 1, y + railH * 0.22, 1, railH * 0.44)
+      }
+      if (on) {
+        ctx.fillStyle = accent
+        ctx.fillRect(x, y, width * 0.58, 2)
+      }
+      text(ctx, String(index + 1).padStart(2, '0'), x, y + railH * 0.52, {
+        size: Math.round(H * 0.0165),
+        mono: true,
+        color: on ? accent : theme.inkFaint,
+        spacing: 1,
+      })
+      text(ctx, scene.nav.label, x + H * 0.034, y + railH * 0.52, {
+        size: Math.round(H * 0.019),
+        color: on ? theme.ink : theme.inkFaint,
+      })
+    })
+  }
+
+  function drawFooter(ctx, left, right = '', accent = theme.accent) {
+    drawFilmRail(ctx, currentKey, accent)
     const barH = H * 0.058
     const y = H - barH
     ctx.fillStyle = 'rgba(8,11,18,0.9)'
@@ -254,7 +294,6 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     const fontSize = Math.round(H * size)
     ctx.save()
     ctx.font = `500 ${px(fontSize)} ${theme.fontMono}`
-    const padding = fontSize * 0.7
     const width = chipWidth(ctx, label, size)
     const height = fontSize * 1.9
     if (solid) {
@@ -302,6 +341,63 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
    * `maxLines` clamps a block: the last line is ellipsised rather than allowed to
    * push everything under it out of the panel.
    */
+  /* --------------------------------------------------------------- copy shaping
+     The panes are narrow — the middle one fits about sixteen characters per line,
+     the outer two about twenty-four — so a sentence from the DOM card always ends
+     in an ellipsis up here. These two helpers show the same words in a shorter
+     form: the opening clauses, or the first sentence, cut at a boundary rather
+     than mid-phrase. Nothing the site says changes; only what fits on a display
+     that is read from across a room. */
+  const CLAUSE_SPLIT = /,\s*| — |: /
+  function screenForm(value, budget = 46, { min = 6 } = {}) {
+    const clauses = String(value).split(CLAUSE_SPLIT)
+    let out = clauses[0]
+    for (const clause of clauses.slice(1)) {
+      if (clause.length < min || out.length + clause.length + 2 > budget) break
+      out += `, ${clause}`
+    }
+    return out.length <= budget ? out : wholeWords(out, budget)
+  }
+
+  /* Glyphs outside Inter's Latin subset fall back to a system font, which means a
+     different shape — and different metrics — on every machine. Anything the data
+     does not cover with plain letters is drawn instead of typed. */
+  function star(ctx, x, y, radius, color) {
+    ctx.save()
+    ctx.fillStyle = color
+    ctx.beginPath()
+    for (let i = 0; i < 10; i += 1) {
+      const r = i % 2 === 0 ? radius : radius * 0.42
+      const angle = -Math.PI / 2 + (i * Math.PI) / 5
+      const px2 = x + Math.cos(angle) * r
+      const py = y + Math.sin(angle) * r
+      if (i === 0) ctx.moveTo(px2, py)
+      else ctx.lineTo(px2, py)
+    }
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+
+  /** Characters a pane holds at a given size — Inter averages about 0.56 em. */
+  const charsFor = (widthPx, sizePx) => Math.max(8, Math.floor(widthPx / (sizePx * 0.56)))
+
+  function wholeWords(value, budget) {
+    let out = ''
+    for (const word of String(value).split(' ')) {
+      if (out && out.length + word.length + 1 > budget) break
+      out = out ? `${out} ${word}` : word
+    }
+    return out
+  }
+
+  function firstSentence(value, budget = 132) {
+    const text = String(value).trim()
+    const stop = text.search(/\.\s|\u2014/)
+    const opening = stop === -1 ? text : text.slice(0, stop + 1)
+    return opening.length <= budget ? opening : wholeWords(opening, budget)
+  }
+
   function bodyText(
     ctx,
     value,
@@ -387,7 +483,16 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
    * that would overflow the column moves to the next row instead of being painted
    * past the edge and then wrapped.
    */
-  function flowChips(ctx, items, x, y, maxWidth, { accent = theme.accent, size = 0.0155, gap = 0.012, rowGap = 0.048 } = {}) {
+  /* `bottom` is the rail line: a chip that would land on it is dropped rather
+     than drawn over the film's chapter rail. */
+  function flowChips(
+    ctx,
+    items,
+    x,
+    y,
+    maxWidth,
+    { accent = theme.accent, size = 0.0155, gap = 0.012, rowGap = 0.048, bottom = H * 0.845 } = {}
+  ) {
     let cursorX = x
     let cursorY = y
     for (const item of items) {
@@ -396,6 +501,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
         cursorX = x
         cursorY += H * rowGap
       }
+      if (cursorY > bottom) break
       chip(ctx, item, cursorX, cursorY, { accent, size })
       cursorX += width + H * gap
     }
@@ -580,7 +686,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       ctx.fillRect(cx3, rowY + H * 0.016, colWidth[2], 1)
     })
 
-    drawFooter(ctx, 'scroll → cinematic timeline', `${projects.length} projects · ${timeline.length} milestones`)
+    drawFooter(ctx, 'scroll · cinematic timeline', `${projects.length} projects · ${timeline.length} milestones`, accent)
   }
 
   function paintAbout(ctx) {
@@ -597,13 +703,26 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     y += H * 0.09
     label(ctx, 'EDUCATION', colX[0], y)
     y += H * 0.045
-    text(ctx, profile.education.degree, colX[0], y, {
-      maxWidth: colWidth[0], size: Math.round(H * 0.023), color: theme.ink })
-    y += H * 0.038
-    text(ctx, `${profile.education.institution} · ${profile.education.years}`, colX[0], y, {
-      size: Math.round(H * 0.021),
+    y = bodyText(ctx, profile.education.degree, colX[0], y, colWidth[0], {
+      size: 0.023,
+      color: theme.ink,
+      lineHeight: 1.25,
+      maxLines: 2,
+    })
+    y += H * 0.034
+    y = bodyText(ctx, profile.education.institution, colX[0], y, colWidth[0], {
+      size: 0.019,
       color: theme.inkFaint,
       mono: true,
+      lineHeight: 1.35,
+      maxLines: 1,
+    })
+    y += H * 0.03
+    bodyText(ctx, profile.education.years, colX[0], y, colWidth[0], {
+      size: 0.019,
+      color: theme.inkFaint,
+      mono: true,
+      maxLines: 1,
     })
 
     // Column B — the four capability rows
@@ -618,13 +737,13 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       text(ctx, fact.title, bx + H * 0.026, rowY, { size: Math.round(H * 0.026), weight: 500, color: theme.ink })
       // Each row flows from the measured height of the previous one, and the
       // detail is clamped so four rows always clear the footer.
-      const lastLine = bodyText(ctx, fact.detail, bx + H * 0.026, rowY + H * 0.038, colWidth[1] - H * 0.03, {
-        size: 0.0205,
+      const lastLine = bodyText(ctx, screenForm(fact.detail, 34), bx + H * 0.026, rowY + H * 0.03, colWidth[1] - H * 0.03, {
+        size: 0.0195,
         color: theme.inkSoft,
-        lineHeight: 1.42,
-        maxLines: 2,
+        lineHeight: 1.3,
+        maxLines: 3,
       })
-      rowY = lastLine + H * 0.0205 * 1.42 + H * 0.032
+      rowY = lastLine + H * 0.0195 * 1.3 + H * 0.024
     })
 
     // Column C — the quiet proof
@@ -640,20 +759,16 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       spacing: 1.6,
     })
     y3 += H * 0.145
-    profile.about.footer.forEach((line, index) => {
-      const value = truncate(
-        ctx,
-        `— ${line}`,
-        colWidth[2],
-        `400 ${px(Math.round(H * 0.0205))} ${theme.fontSans}`
-      )
-      text(ctx, value, cx3, y3 + index * H * 0.042, {
-        size: Math.round(H * 0.0205),
-        color: theme.inkSoft,
+    profile.about.footer.forEach((line) => {
+      y3 = bodyText(ctx, `— ${line}`, cx3, y3, colWidth[2], {
+        size: 0.0205,
+        color: theme.inkFaint,
+        lineHeight: 1.34,
+        maxLines: 3,
       })
+      y3 += H * 0.026
     })
-
-    drawFooter(ctx, 'available for internships & freelance', 'updated 2026')
+    drawFooter(ctx, 'available for internships & freelance', 'updated 2026', accent)
   }
 
   function paintSkills(ctx) {
@@ -668,15 +783,20 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       // The note wraps to two lines on narrow columns, so the item list starts
       // from where it actually ended.
       const noteEnd = bodyText(ctx, category.note, x, y + H * 0.055, maxWidth, {
-        size: 0.0185,
+        size: 0.0175,
         color: theme.inkFaint,
         lineHeight: 1.4,
-        maxLines: 2,
+        maxLines: 3,
       })
-      let cy = noteEnd + H * 0.0185 * 1.4 + H * 0.016
+      let cy = noteEnd + H * 0.0175 * 1.4 + H * 0.016
       category.items.forEach((item) => {
-        text(ctx, '▍', x, cy, { size: Math.round(H * 0.021), color: `${category.accent}bb` })
-        text(ctx, item, x + H * 0.028, cy, { size: Math.round(H * 0.024), color: theme.ink })
+        ctx.fillStyle = `${category.accent}bb`
+        ctx.fillRect(x, cy - H * 0.019, H * 0.008, H * 0.022)
+        text(ctx, item, x + H * 0.028, cy, {
+          size: Math.round(H * 0.024),
+          color: theme.ink,
+          maxWidth: maxWidth - H * 0.028,
+        })
         cy += H * 0.038
       })
       return cy
@@ -716,10 +836,10 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     y3 += H * 0.38
     label(ctx, 'ALSO USING', cx3, y3)
     y3 += H * 0.045
-    const also = [...new Set(skillCategories.flatMap((category) => category.also))].slice(0, 6)
-    flowChips(ctx, also, cx3, y3, colWidth[2], { accent, size: 0.0155, gap: 0.014 })
+    const also = [...new Set(skillCategories.flatMap((category) => category.also))].slice(0, 5)
+    flowChips(ctx, also, cx3, y3, colWidth[2], { accent, size: 0.0145, gap: 0.012 })
 
-    drawFooter(ctx, 'tools · languages · platforms', 'frontend · backend · programming · dev')
+    drawFooter(ctx, 'tools · languages · platforms', 'frontend · backend · programming · dev', accent)
   }
 
   function paintProject(ctx, project, t) {
@@ -750,16 +870,18 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       wrap: true,
     })
     y += H * 0.05
-    text(ctx, truncate(ctx, project.subtitle, colWidth[0], `400 ${px(Math.round(H * 0.021))} ${theme.fontSans}`), colX[0], y, {
-      size: Math.round(H * 0.021),
+    y = bodyText(ctx, project.subtitle, colX[0], y, colWidth[0], {
+      size: 0.021,
       color: accent,
+      lineHeight: 1.3,
+      maxLines: 2,
     })
-    y += H * 0.055
-    y = bodyText(ctx, project.summary, colX[0], y, colWidth[0], {
+    y += H * 0.038
+    y = bodyText(ctx, firstSentence(project.summary), colX[0], y, colWidth[0], {
       size: 0.021,
       color: theme.inkSoft,
       lineHeight: 1.5,
-      maxLines: 7,
+      maxLines: 6,
     })
     y += H * 0.055
     label(ctx, 'STACK', colX[0], y)
@@ -776,10 +898,10 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       ctx.fillStyle = `${accent}88`
       ctx.fillRect(bx, highlightY - H * 0.02, H * 0.014, 1.5)
       const lastLine = bodyText(ctx, highlight, bx + H * 0.03, highlightY, colWidth[1] - H * 0.034, {
-        size: 0.021,
+        size: 0.0195,
         color: theme.inkSoft,
         lineHeight: 1.4,
-        maxLines: 3,
+        maxLines: 4,
       })
       highlightY = lastLine + H * 0.021 * 1.4 + H * 0.030
     })
@@ -817,7 +939,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       chip(ctx, 'LIVE', cx3, H * 0.86, { accent: theme.positive, size: 0.016, solid: true })
     }
 
-    drawFooter(ctx, project.tagline.slice(0, 58), project.year)
+    drawFooter(ctx, screenForm(project.tagline, 52), project.year, accent)
   }
 
   /** A small, honest diagram of how each project is put together. */
@@ -944,53 +1066,89 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     const certs = timeline.filter((item) => item.kind === 'certification')
     const others = timeline.filter((item) => item.kind !== 'certification')
 
+    /* A rail of four entries rather than five: titles and organisations are long
+       enough to need two lines each ("Smart India Hackathon — ISRO problem
+       statement"), and a flow layout keeps the rows from touching. */
     const paintRail = (items, x, y, maxWidth, title) => {
       label(ctx, title, x, y)
       ctx.fillStyle = theme.line
-      ctx.fillRect(x + 5, y + H * 0.032, 1, H * 0.5)
-      items.slice(0, 5).forEach((item, index) => {
-        const rowY = y + H * 0.075 + index * H * 0.105
+      ctx.fillRect(x + 5, y + H * 0.032, 1, H * 0.56)
+      const indent = H * 0.03
+      let rowY = y + H * 0.075
+      items.slice(0, 4).forEach((item, index) => {
         ctx.beginPath()
         ctx.fillStyle = index === 0 ? accent : 'rgba(255,255,255,0.28)'
         ctx.arc(x + 5.5, rowY - H * 0.008, index === 0 ? 4.5 : 3, 0, Math.PI * 2)
         ctx.fill()
-        text(ctx, item.period, x + H * 0.03, rowY - H * 0.028, {
+        text(ctx, item.period, x + indent, rowY - H * 0.028, {
           size: Math.round(H * 0.0175),
           mono: true,
           color: theme.inkFaint,
           spacing: 1,
         })
-        text(ctx, truncate(ctx, item.title, maxWidth - H * 0.03, `500 ${Math.round(H * 0.023)}px ${theme.fontSans}`), x + H * 0.03, rowY, {
-          size: Math.round(H * 0.023),
-          weight: 500,
-          color: theme.ink,
-        })
-        text(ctx, item.organisation, x + H * 0.03, rowY + H * 0.028, {
-          size: Math.round(H * 0.0185),
-          color: theme.inkFaint,
-          maxWidth: maxWidth - H * 0.03,
-        })
+        /* A 2% safety margin on the estimate: one word too many is an ellipsis. */
+        const titleBudget = Math.floor(1.96 * charsFor(maxWidth - indent, H * 0.021))
+        const titleEnd = bodyText(
+          ctx,
+          screenForm(item.title, titleBudget),
+          x + indent,
+          rowY,
+          maxWidth - indent,
+          { size: 0.021, weight: 500, color: theme.ink, lineHeight: 1.22, maxLines: 2 }
+        )
+        const orgEnd = bodyText(
+          ctx,
+          screenForm(item.organisation, Math.floor(1.9 * charsFor(maxWidth - indent, H * 0.0185))),
+          x + indent,
+          titleEnd + H * 0.021 * 1.22 + H * 0.006,
+          maxWidth - indent,
+          { size: 0.0185, color: theme.inkFaint, lineHeight: 1.3, maxLines: 2 }
+        )
+        rowY = orgEnd + H * 0.0185 * 1.3 + H * 0.028
       })
     }
 
     paintRail(certs, colX[0], H * 0.2, colWidth[0], 'CERTIFICATIONS')
-    paintRail(others.slice(0, 5), colX[1], H * 0.2, colWidth[1], 'TRAINING & HACKATHONS')
+    paintRail(others.slice(0, 4), colX[1], H * 0.2, colWidth[1], 'TRAINING & HACKATHONS')
 
     // Column C — achievements
     const cx3 = colX[2]
     label(ctx, 'ACHIEVEMENTS', cx3, H * 0.2)
-    achievements.forEach((item, index) => {
-      const rowY = H * 0.29 + index * H * 0.145
-      text(ctx, item.value, cx3, rowY, { size: Math.round(H * 0.062), weight: 600, color: accent, maxWidth: colWidth[2] })
-      text(ctx, item.label, cx3, rowY + H * 0.032, { size: Math.round(H * 0.022), color: theme.ink, maxWidth: colWidth[2] })
-      text(ctx, item.detail, cx3, rowY + H * 0.06, {
-        size: Math.round(H * 0.0185),
-        color: theme.inkFaint,
+    let ay = H * 0.27
+    achievements.slice(0, 3).forEach((item) => {
+      const figure = String(item.value).replace(/★/g, '').trim()
+      const stars = (String(item.value).match(/★/g) || []).length
+      const figureSize = Math.round(H * 0.062)
+      text(ctx, figure, cx3, ay, {
+        size: Math.round(H * 0.062),
+        weight: 600,
+        color: accent,
         maxWidth: colWidth[2],
       })
+      if (stars) {
+        ctx.font = `600 ${px(figureSize)} ${theme.fontSans}`
+        let starX = cx3 + ctx.measureText(figure).width + figureSize * 0.22
+        for (let i = 0; i < stars; i += 1) {
+          star(ctx, starX + figureSize * 0.3, ay - figureSize * 0.3, figureSize * 0.32, accent)
+          starX += figureSize * 0.72
+        }
+      }
+      const labelEnd = bodyText(ctx, item.label, cx3, ay + H * 0.034, colWidth[2], {
+        size: 0.022,
+        color: theme.ink,
+        lineHeight: 1.25,
+        maxLines: 2,
+      })
+      const detailEnd = bodyText(ctx, item.detail, cx3, labelEnd + H * 0.022 * 1.25 + H * 0.006, colWidth[2], {
+        size: 0.0185,
+        color: theme.inkFaint,
+        lineHeight: 1.35,
+        maxLines: 2,
+      })
+      ay = detailEnd + H * 0.0185 * 1.35 + H * 0.046
     })
 
-    drawFooter(ctx, 'education · certifications · hackathons', 'newest first')
+    drawFooter(ctx, 'education · certifications · hackathons', 'newest first', accent)
   }
 
   function paintContact(ctx, t) {
@@ -1065,7 +1223,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       })
     })
 
-    drawFooter(ctx, 'thanks for scrolling', new Date().getFullYear().toString())
+    drawFooter(ctx, 'thanks for scrolling', `updated ${new Date().getFullYear()}`, accent)
   }
 
   /* ---------------- Status panel ---------------- */

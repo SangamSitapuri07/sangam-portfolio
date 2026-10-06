@@ -14,7 +14,13 @@ import { scrollToSection, scrollToProgress } from '@/lib/scrollEngine'
  * On small screens the links collapse into a sheet that traps focus, closes on
  * Escape, and restores focus to the trigger.
  */
-export default function Navbar({ activeSceneId, ready, onSceneChange, staticMode = false }) {
+export default function Navbar({
+  activeSceneId,
+  ready,
+  onSceneChange,
+  staticMode = false,
+  onToggleStatic = null,
+}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const sheetRef = useRef(null)
   const triggerRef = useRef(null)
@@ -124,6 +130,20 @@ export default function Navbar({ activeSceneId, ready, onSceneChange, staticMode
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Only offered when WebGL works: on a device without it the lite page
+              is already what is being shown, and there is nothing to toggle. */}
+          {onToggleStatic ? (
+            <button
+              type="button"
+              onClick={onToggleStatic}
+              aria-pressed={staticMode}
+              title={staticMode ? 'Load the full 3D film' : 'Skip 3D — read the plain page'}
+              className="hidden rounded-full border border-line bg-surface-2/50 px-3.5 py-2 text-[0.8125rem] text-ink-faint backdrop-blur-md transition-colors hover:border-accent/60 hover:text-ink sm:inline-flex"
+            >
+              {staticMode ? '3D' : 'Lite'}
+            </button>
+          ) : null}
+
           <a
             href={profile.resume.href}
             download

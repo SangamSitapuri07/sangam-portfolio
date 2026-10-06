@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 
 import { createDirector } from '@/lib/director'
@@ -66,20 +66,6 @@ export default function CameraRig({
       }
     }
   })
-
-  /** Children register their objects here; the loop picks them up without a render. */
-  const register = useCallback(
-    (objects) => {
-      if (objects?.rig) refs.current.rig = objects.rig
-      if (objects?.lights) refs.current.lights = objects.lights
-    },
-    [refs]
-  )
-
-  useMemo(() => {
-    refs.current.register = register
-    return register
-  }, [refs, register])
 
   return null
 }

@@ -23,7 +23,7 @@ export default function Loader({ onComplete }) {
   const [leaving, setLeaving] = useState(false)
   const [done, setDone] = useState(false)
 
-  const startedAt = useRef(typeof performance === 'undefined' ? 0 : performance.now())
+  const startedAt = useRef(0)
   const displayedRef = useRef(0)
   const frameRef = useRef(0)
 
@@ -31,6 +31,9 @@ export default function Loader({ onComplete }) {
    * the number never lies about being finished. */
   useEffect(() => {
     if (done) return undefined
+
+    // The clock starts when the effect runs, not while React is rendering.
+    if (!startedAt.current) startedAt.current = performance.now()
 
     let raf = 0
     let previous = performance.now()

@@ -23,6 +23,15 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      /* React Compiler's purity rules assume state lives in React. This scene is
+         the opposite by design: three.js objects (the renderer, materials, the
+         camera, the scene graph) are mutated imperatively from the frame loop and
+         from effects, because per-frame React state is exactly what the brief
+         forbids. Mutating them is the documented R3F pattern, so these stay
+         warnings rather than errors — the screen painters and the rig harness
+         cover the behaviour they cannot reason about. */
+      'react-hooks/immutability': 'warn',
+      'react-hooks/refs': 'warn',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },

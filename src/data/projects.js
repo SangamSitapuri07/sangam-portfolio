@@ -28,7 +28,7 @@ export const projects = [
       'Twelve live ocean sources — no dummy data anywhere',
       'Ten-agent reasoning: risk, ecology, anomaly, validation',
       'Courses verified every 2 km against the GLOBE 1 km land mask',
-      'Bilingual skipper advisories using WMO / IMD small-craft thresholds',
+      'Bilingual skipper advisories using WMO / IMD thresholds',
       'A failing source is reported with its real reason — never invented values',
     ],
     stats: [
@@ -62,7 +62,7 @@ export const projects = [
     highlights: [
       'Rooms for up to eight players, with share codes and friend invites',
       'Server-side validation of turn order, card legality and deck integrity',
-      'Rules engine supporting official rules plus six house-rule variants',
+      'Rules engine supporting official rules plus six variants',
       'Rating-based matchmaking queues and level progression',
     ],
     stats: [
@@ -95,9 +95,9 @@ export const projects = [
     tech: ['React', 'Three.js', 'React Three Fiber', 'Node.js', 'Express', 'Gemini', 'Groq'],
     highlights: [
       'Live 3D battle arena rendered with React Three Fiber',
-      'Argument generator structured as claim, reasoning, evidence, impact',
-      'Counterargument builder that targets weak logic in the opponent’s case',
-      'Scorecard for clarity, logic, evidence and impact with actionable feedback',
+      'Argument generator: claim, reasoning, evidence, impact',
+      'Counterargument builder targeting weak logic',
+      'Scorecard scoring clarity, logic, evidence and impact',
       'Switchable models — Gemini 2.0 Flash and Groq (Llama 3 / Mixtral)',
     ],
     stats: [
@@ -128,7 +128,7 @@ export const projects = [
       'Content model covering articles, polls and video posts',
       'User contributions and an admin publishing flow',
       'Video content delivered through YouTube links — no external news API',
-      'Designed for a fast, lightweight reading experience on low-end devices',
+      'Lightweight reading experience on low-end devices',
     ],
     stats: [
       { value: '3', label: 'content types' },
@@ -154,10 +154,10 @@ export const projects = [
     role: 'Design & engineering',
     tech: ['React', 'Vite', 'Three.js', 'React Three Fiber', 'GSAP ScrollTrigger', 'Lenis', 'Tailwind'],
     highlights: [
-      'One normalised scroll progress drives camera, hinge, screen and text',
+      'Scroll progress drives camera, hinge, screen and text',
       'A scanned laptop model rigged with a real hinge pivot, not a fake rotation',
-      'Screen interfaces drawn to canvas textures and swapped per section',
-      'Quality tiers, reduced-motion support and an HTML fallback for no-WebGL devices',
+      'Screen interfaces drawn to canvas, swapped per section',
+      'Quality tiers, reduced motion and an HTML fallback',
     ],
     stats: [
       { value: '1', label: 'scroll timeline' },
