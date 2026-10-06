@@ -356,8 +356,13 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       if (clause.length < min || out.length + clause.length + 2 > budget) break
       out += `, ${clause}`
     }
-    return out.length <= budget ? out : wholeWords(out, budget)
+    /* A cut that is not shown as a cut is a lie, so the ellipsis is mandatory. */
+    if (out.length <= budget) return out
+    return `${trimDangling(wholeWords(out, budget))}…`
   }
+
+  /** Never leave a sentence hanging on a dash, comma or space. */
+  const trimDangling = (value) => String(value).replace(/[\s\u2014\-–—,;:]+$/u, '')
 
   /* Glyphs outside Inter's Latin subset fall back to a system font, which means a
      different shape — and different metrics — on every machine. Anything the data
@@ -393,9 +398,11 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
 
   function firstSentence(value, budget = 132) {
     const text = String(value).trim()
-    const stop = text.search(/\.\s|\u2014/)
+    /* Only a real sentence end counts. An em dash introduces an explanation, so
+       stopping there would leave the screen reading "…the text overlays —". */
+    const stop = text.search(/[.!?](\s|$)/)
     const opening = stop === -1 ? text : text.slice(0, stop + 1)
-    return opening.length <= budget ? opening : wholeWords(opening, budget)
+    return opening.length <= budget ? opening : `${trimDangling(wholeWords(opening, budget))}…`
   }
 
   function bodyText(
@@ -936,7 +943,15 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     })
 
     if (project.links?.live) {
-      chip(ctx, 'LIVE', cx3, H * 0.86, { accent: theme.positive, size: 0.016, solid: true })
+      /* Beside the diagram's own label rather than at a fixed height, where it
+         used to land on the last statistic. */
+      ctx.font = `400 ${px(Math.round(H * 0.019))} ${theme.fontMono}`
+      const labelWidth = ctx.measureText(project.screen?.mode?.toUpperCase() || 'SYSTEM').width
+      chip(ctx, 'LIVE', cx3 + labelWidth + H * 0.045, H * 0.2, {
+        accent: theme.positive,
+        size: 0.016,
+        solid: true,
+      })
     }
 
     drawFooter(ctx, screenForm(project.tagline, 52), project.year, accent)
@@ -1195,7 +1210,9 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
       ctx.fillRect(colX[1], rowY + H * 0.055, colWidth[1], 1)
     })
 
-    // Column C — availability and a recap of the journey
+    /* Column C — availability, then the numbers it is worth ending on. The
+       chapter list that used to live here is now the film rail below every
+       screen, so this space recaps the numbers instead. */
     const cx3 = colX[2]
     let y3 = H * 0.24
     const pulse = 0.6 + 0.4 * Math.sin(t * 2.2)
@@ -1205,22 +1222,41 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     ctx.arc(cx3 + 5, y3 - 6, 5, 0, Math.PI * 2)
     ctx.fill()
     ctx.globalAlpha = 1
-    text(ctx, profile.status, cx3 + H * 0.035, y3, { size: Math.round(H * 0.023), color: theme.ink })
+    y3 = bodyText(ctx, profile.status, cx3 + H * 0.035, y3, colWidth[2] - H * 0.035, {
+      size: 0.023,
+      color: theme.ink,
+      lineHeight: 1.25,
+      maxLines: 2,
+    })
 
-    y3 += H * 0.09
-    label(ctx, 'SCENE', cx3, y3)
-    y3 += H * 0.045
-    const sceneNames = ['Intro', 'Hero', 'About', 'Skills', 'Projects', 'Timeline', 'Contact']
-    const active = Math.floor(clamp(getProgress(), 0, 0.999) * sceneNames.length)
-    sceneNames.forEach((name, index) => {
-      const rowY = y3 + index * H * 0.048
-      ctx.fillStyle = index === active ? accent : 'rgba(255,255,255,0.16)'
-      ctx.fillRect(cx3, rowY - H * 0.014, H * 0.05, 2)
-      text(ctx, name, cx3 + H * 0.07, rowY, {
-        size: Math.round(H * 0.021),
-        color: index === active ? theme.ink : theme.inkFaint,
-        mono: index === active,
+    y3 += H * 0.075
+    label(ctx, 'BY THE NUMBERS', cx3, y3)
+    y3 += H * 0.05
+    profile.facts.forEach((fact) => {
+      const value = String(fact.value).replace(/★/g, '').trim()
+      const figureSize = Math.round(H * 0.04)
+      text(ctx, value, cx3, y3, {
+        size: Math.round(H * 0.04),
+        weight: 600,
+        color: accent,
+        maxWidth: colWidth[2],
       })
+      if (/★/.test(String(fact.value))) {
+        ctx.font = `600 ${px(figureSize)} ${theme.fontSans}`
+        const stars = (String(fact.value).match(/★/g) || []).length
+        let starX = cx3 + ctx.measureText(value).width + figureSize * 0.2
+        for (let i = 0; i < stars; i += 1) {
+          star(ctx, starX + figureSize * 0.3, y3 - figureSize * 0.3, figureSize * 0.26, accent)
+          starX += figureSize * 0.6
+        }
+      }
+      const labelEnd = bodyText(ctx, fact.label, cx3, y3 + H * 0.024, colWidth[2], {
+        size: 0.0195,
+        color: theme.inkSoft,
+        lineHeight: 1.3,
+        maxLines: 2,
+      })
+      y3 = labelEnd + H * 0.0195 * 1.3 + H * 0.036
     })
 
     drawFooter(ctx, 'thanks for scrolling', `updated ${new Date().getFullYear()}`, accent)

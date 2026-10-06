@@ -238,6 +238,19 @@ try {
       )
       reports.push({ key, text: [...painted], colours })
 
+      /* Text beyond the canvas edge is simply gone — nothing overlaps, so the
+         collision check cannot see it. */
+      const offCanvas = runs.filter(
+        (run) => run.left < -1 || run.right > canvas.width + 1 || run.top < -1 || run.bottom > canvas.height + 1
+      )
+      check(
+        `“${key}” keeps every label inside the panel`,
+        offCanvas.length === 0,
+        offCanvas.length
+          ? `→ ${JSON.stringify(offCanvas[0].text)} at x ${Math.round(offCanvas[0].left)}…${Math.round(offCanvas[0].right)} of ${canvas.width}`
+          : ''
+      )
+
       const outsideFont = painted.filter((value) => NOT_IN_INTER.test(value))
       check(
         `“${key}” only draws glyphs the font covers`,
