@@ -54,6 +54,17 @@ export default function App() {
      weak device can choose it, and the choice sticks for their whole session. */
   const toggleStaticScene = useCallback(() => setForcedStatic((value) => !value), [])
 
+  /* Switching between the film and the plain page changes the document height,
+     which leaves the scroll position meaningless. Land on the section the visitor
+     was watching instead of wherever the browser clamped to. */
+  const wasStatic = useRef(useStatic)
+  useEffect(() => {
+    const changed = wasStatic.current !== useStatic
+    wasStatic.current = useStatic
+    if (!changed || !useStatic) return
+    document.getElementById(activeSceneId)?.scrollIntoView({ block: 'start' })
+  }, [useStatic, activeSceneId])
+
   /* ---- Keep the layout variant honest across resizes ---- */
   useEffect(() => {
     const onResize = () => {
