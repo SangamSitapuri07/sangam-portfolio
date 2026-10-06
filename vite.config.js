@@ -38,7 +38,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: false,
-    chunkSizeWarningLimit: 900,
+    /* three.js is one unavoidable 1.1 MB chunk; it is already split away from the
+       app and the framework, so the 900 kB default warning is just noise. */
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {

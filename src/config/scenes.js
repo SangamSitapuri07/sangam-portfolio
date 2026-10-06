@@ -86,16 +86,19 @@ export const scenes = [
     height: 150,
     nav: { label: 'About', id: 'about' },
     /** Pushed in until the display itself is the subject. */
+    framing: 'closeup',
     camera: {
       anchor: 'screen',
       offset: [0.16, 0.2, 1.52],
-      look: { anchor: 'screen', offset: [0, -0.02, 0] },
+      /* Aim a little to the right of the display so it settles left of centre and
+         the carded copy on the right sits over a darker part of the frame. */
+      look: { anchor: 'screen', offset: [0.2, -0.02, 0] },
       fov: 30,
     },
     cameraMobile: {
       anchor: 'screen',
       offset: [0.16, 0.24, 1.78],
-      look: { anchor: 'screen', offset: [0, 0, 0] },
+      look: { anchor: 'screen', offset: [0.2, 0, 0] },
       fov: 42,
     },
     laptop: { position: [0, 0, 0], rotation: [0, -0.1, 0] },
@@ -135,6 +138,9 @@ export const scenes = [
     name: 'Projects',
     /* The strongest section, and the longest in scroll: one beat per project. */
     height: 265,
+    /* Every beat is a push-in: the display is the backdrop behind the cards, so
+       composition is judged as a close-up rather than a full-machine shot. */
+    framing: 'closeup',
     nav: { label: 'Projects', id: 'projects' },
     camera: {
       anchor: 'screen',

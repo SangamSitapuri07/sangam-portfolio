@@ -111,6 +111,9 @@ function prepareScreenMaterial(material, { intensity }) {
   material.metalness = 0
   material.roughness = 0.34
   material.toneMapped = true
+  // The scan's panel winding is not uniform across its screens: double-siding
+  // makes the display readable no matter which way a re-export faces it.
+  material.side = THREE.DoubleSide
   material.needsUpdate = true
 
   return original
@@ -190,33 +193,29 @@ export function assembleLaptop(source, { quality } = {}) {
     return found
   }
 
-  /* Located by NODE name (GLTFLoader names objects after the glTF node, not the
-     mesh). If a re-export renames things, fall back to the emissive-material
-     signature: the display panes are the only emissive surfaces on the lid. */
-  const findScreenByEmissive = (group) => {
-    let best = null
-    let bestStrength = 0
+  /* Screens are located by NODE name, because GLTFLoader names the Object3D after
+     the glTF node — in this asset the display panels are nodes "Object_24" and
+     "Object_25" while their meshes are named "Object_19" / "Object_20", and other
+     nodes carry those same numbers. So the mesh names are deliberately NOT used as
+     a fallback; if a re-export renames the nodes, the emissive signature decides:
+     the display panes are the only light-emitting surfaces on the lid. */
+  const findEmissive = (group) => {
+    const found = []
     group.traverse((child) => {
       if (!child.isMesh) return
       const materials = Array.isArray(child.material) ? child.material : [child.material]
-      for (const material of materials) {
-        if (!material?.emissiveMap && !material?.emissive) continue
-        const strength = material.emissiveIntensity ?? 0
-        if (strength >= bestStrength) {
-          bestStrength = strength
-          best = child
-        }
-      }
+      const strength = Math.max(
+        0,
+        ...materials.map((material) => (material?.emissiveMap || material?.emissive ? material.emissiveIntensity ?? 0 : 0))
+      )
+      if (strength > 0) found.push({ mesh: child, strength })
     })
-    return best
+    return found.sort((a, b) => b.strength - a.strength).map((entry) => entry.mesh)
   }
 
-  const mainMesh =
-    findByName(lid, screenConfig.main.node) ||
-    findByName(lid, screenConfig.main.meshName) ||
-    findScreenByEmissive(lid)
-  const statusMesh =
-    findByName(lid, screenConfig.status.node) || findByName(lid, screenConfig.status.meshName)
+  const emissiveScreens = findEmissive(lid)
+  const mainMesh = findByName(lid, screenConfig.main.node) || emissiveScreens[0] || null
+  const statusMesh = findByName(lid, screenConfig.status.node) || emissiveScreens[1] || null
 
   for (const [key, mesh] of [
     ['main', mainMesh],
