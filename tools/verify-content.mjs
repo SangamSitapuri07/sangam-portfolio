@@ -246,6 +246,50 @@ const walk = async (dir) => {
   return files
 }
 
+/* ------------------------------------------------------------- copy hygiene
+ * The prose is the product; a stray double space or a full stop with no space
+ * after it is exactly the kind of thing nobody notices again once it ships. Walk
+ * every string in the data modules and hold them all to the same rules.
+ */
+const COPY_RULES = [
+  [/ {2,}/, 'double space'],
+  [/ [,.;:!?]/, 'space before punctuation'],
+  [/\b([A-Za-z]{3,})\s+\1\b/i, 'repeated word'],
+  [/[a-z]\.[A-Z]/, 'no space after a full stop'],
+  [/(\d)(kg|km|GB|MB|ms)\b/, 'no space before a unit'],
+  [/,\s*,|\.[\s.]*\./, 'doubled punctuation'],
+  [/\s$/, 'trailing space'],
+  [/^\s/, 'leading space'],
+  [/\s[—–-]$/, 'dangling dash'],
+]
+
+const copyStrings = []
+const collectStrings = (value, path) => {
+  if (typeof value === 'string') copyStrings.push({ path, value })
+  else if (Array.isArray(value)) value.forEach((entry, i) => collectStrings(entry, `${path}[${i}]`))
+  else if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) collectStrings(entry, `${path}.${key}`)
+  }
+}
+for (const [name, module] of Object.entries({
+  profile: person,
+  projects,
+  skillCategories,
+  timeline,
+  achievements,
+  moreOnGitHub,
+})) {
+  collectStrings(module, name)
+}
+
+for (const { path, value } of copyStrings) {
+  for (const [pattern, label] of COPY_RULES) {
+    if (pattern.test(value)) failures.push(`${path}: ${label} — ${JSON.stringify(value.slice(0, 80))}`)
+  }
+}
+checks += COPY_RULES.length
+console.log(`\n▸ copy hygiene · ${copyStrings.length} strings against ${COPY_RULES.length} rules`)
+
 let swept = 0
 for (const file of await walk(srcDir)) {
   const code = await readFile(file, 'utf8')
