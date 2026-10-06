@@ -191,6 +191,45 @@ The film switches between its desktop and mobile camera paths.
 **Wrong:** copy overlapping the machine; the display's text running into a pane
 seam; a stage that stays desktop-sized on a narrow window.
 
+## 11b · The demo environment
+
+Click **Run demo** on each project card. Then hover the laptop's display while a
+project is on screen and click it.
+
+**Correct:** a browser frame for AI Debate Coach (it should genuinely load and
+run); a phone frame for Nuno and News Pinch, playing the CV's recorded demo with
+a **Recorded demo** badge. Hovering the display shows "Click the display to run
+…", Escape closes, and focus returns to whatever you clicked. Scrolling is frozen
+behind the overlay and resumes on close.
+
+**Wrong:** a blank frame with no explanation (there is an 11-second timeout that
+should replace it with a message and a way out); the portfolio itself rendering
+inside the frame (that would mean a hosted build was wrongly detected); the page
+scrolling behind the overlay.
+
+Note: whether `debate-coach.netlify.app` *allows* being framed is up to that site's
+headers, which I could not check from this sandbox — the network here blocks both
+Netlify and Drive. If it refuses, you will see the honest fallback instead of the
+app, and that is the designed behaviour rather than a bug.
+
+## 11c · Dragging the machine
+
+Drag the laptop with the mouse. Then, on the phone, swipe sideways on it, and
+swipe up and down.
+
+**Correct:** dragging turns the machine; releasing lets it settle back to the
+storyboard angle over a second or so. A phone's vertical swipe scrolls the page as
+usual — only a clearly horizontal gesture turns the machine. Stop touching
+anything for a couple of seconds and it drifts, slowly, instead of hanging still.
+
+**Wrong:** the whole camera swinging when you drag (a drag must turn the object,
+not the viewpoint — `verify:film` asserts the camera does not move by even one
+float); the machine staying turned after release; vertical swipes on a phone
+turning the machine instead of scrolling; drift so large it looks like a fault.
+
+If dragging feels too weak or too strong, that is one number:
+`YAW_RANGE` in `src/lib/interaction.js`.
+
 ## 12 · Console must be empty
 
 At the end of all of the above, the console should hold **no errors and no
@@ -214,6 +253,14 @@ For each problem, capture: **scene** (intro…contact), **what you did**, **what
 happened**, **what you expected**, and whether it survives a hard reload. A
 screenshot beats a sentence. Anything reproducible goes in a GitHub issue against
 PR #1.
+
+### Reference: the three projects and how they run
+
+| Project | Demo | Can it truly run here? |
+| --- | --- | --- |
+| AI Debate Coach | embedded live web app | yes — it is a deployed web app |
+| Nuno | recorded demo, phone frame | yes, **if** you drop in a `flutter build web` output |
+| News Pinch | recorded demo, phone frame | no — a native Android APK cannot run in a browser |
 
 ### Reference: the seven chapters and their displays
 
