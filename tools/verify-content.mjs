@@ -263,8 +263,22 @@ for (const file of await walk(srcDir)) {
   }
 }
 
-/* ------------------------------------------------------------------ report */
-checks += swept
+/* ------------------------------------------------------------------ report
+ * `checks` counts the explicit assertions, `swept` the data reads, and the one
+ * check below makes the README's quoted total the last thing to be verified: a
+ * count nobody re-reads goes stale, so the suite reads its own documentation.
+ */
+const total = checks + swept + 1
+const readmeQuote = await readFile(path.join(root, 'README.md'), 'utf8')
+  .then((text) => text.match(/`verify:content`\s*\|\s*(\d[\d,]*)\s+assertions/))
+  .catch(() => null)
+if (!readmeQuote) {
+  failures.push('README.md no longer quotes how many assertions this suite makes')
+} else if (Number(readmeQuote[1].replace(/,/g, '')) !== total) {
+  failures.push(`README.md says ${readmeQuote[1]} assertions; this suite makes ${total}`)
+}
+checks = total
+
 console.log(
   `\n▸ ${checks} assertions · ${swept} data reads cross-checked · ` +
     `${failures.length ? `${failures.length} FAILED` : 'all good'}`
