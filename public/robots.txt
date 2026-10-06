@@ -1,0 +1,6 @@
+# Sangam Sitapuri — portfolio
+User-agent: *
+Allow: /
+
+# The résumé and the 3D model are public assets; nothing here is private.
+Sitemap: https://sangam-portfolio-roan.vercel.app/sitemap.xml
