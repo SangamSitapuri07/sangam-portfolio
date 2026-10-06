@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Cinematic, scroll-driven 3D developer portfolio — React, Vite, Three.js, React Three Fiber, GSAP ScrollTrigger, Lenis.",
+  "description": "Cinematic, scroll-driven 3D developer portfolio \u2014 React, Vite, Three.js, React Three Fiber, GSAP ScrollTrigger, Lenis.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,8 +14,9 @@
     "verify:rig": "node tools/verify-rig.mjs",
     "og": "node tools/generate-og.mjs",
     "verify:content": "node tools/verify-content.mjs",
-    "verify": "npm run verify:content && npm run verify:rig && npm run verify:dom",
-    "verify:dom": "node tools/verify-dom.mjs"
+    "verify": "npm run verify:content && npm run verify:rig && npm run verify:dom && npm run verify:screens",
+    "verify:dom": "node tools/verify-dom.mjs",
+    "verify:screens": "node tools/verify-screens.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
