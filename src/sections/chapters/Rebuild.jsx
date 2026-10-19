@@ -1,5 +1,6 @@
 import { chapterById } from '@/data/chapters'
 import ChapterHeading from './ChapterHeading'
+import StoryCaption from '@/components/StoryCaption'
 
 /**
  * Scene 07 — The Reassembly Protocol.
@@ -14,6 +15,10 @@ export default function Rebuild() {
   return (
     <div className="w-full space-y-6">
       <ChapterHeading chapter={chapter} id="rebuild-heading" />
+
+      {/* The four parts the teardown did not narrate get their lines here, while
+          the same four transforms play backwards. */}
+      <StoryCaption sceneId="rebuild" />
 
       <ol className="max-w-md space-y-2 border-t border-line/70 pt-5 text-xs leading-relaxed text-ink-soft">
         <li className="flex gap-3">

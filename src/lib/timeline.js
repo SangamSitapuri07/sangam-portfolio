@@ -160,6 +160,18 @@ export function buildKeyframes({
           projectIndex: index,
         })
       })
+
+      /* A scene still has to end on a defined shot: without this key the last
+         project beat would be the scene's last word and the handover to Scene 06
+         would be interpolated across a quarter of the scene. */
+      keys.push({
+        ...carried,
+        at: sceneRange.from + sceneRange.span * 0.86,
+        camera,
+        kind: 'scene',
+        beat: null,
+        projectIndex: -1,
+      })
       continue
     }
 
@@ -235,6 +247,69 @@ export function blendKeyframes(a, b, t, out = {}) {
     bloom: lerp(a.fx.bloom, b.fx.bloom),
   }
   return out
+}
+
+/* ------------------------------------------------------------------ *
+ * Story beats
+ *
+ * Scene 03 (and the two scenes that follow it) do not just open the machine into a
+ * cloud of parts: they stop on one component at a time, and each component carries
+ * a claim the portfolio actually makes (`config/parts.js`). A beat is a window in
+ * the scene's own 0…1 range, with a single part and a weight that rises and falls.
+ *
+ * One id at a time, windows non-overlapping, weight a pure function of progress —
+ * so scrubbing backwards is identical, and the DOM caption and the 3D emphasis can
+ * read the same number instead of two animations trying to stay in step.
+ * ------------------------------------------------------------------ */
+
+/** Local progress (0…1) inside a scene. */
+export function sceneLocalAt(index, p) {
+  const range = sceneRanges[index]
+  if (!range) return 0
+  const span = Math.max(range.span, 1e-6)
+  return clamp01((clamp01(p) - range.from) / span)
+}
+
+/**
+ * Resolve a scene's beats into absolute windows.
+ * Beats are authored as `{ part, from, to }` in scene-local progress.
+ */
+export function storyBeats(scene, index = sceneRanges.findIndex((range) => range.id === scene?.id)) {
+  const range = sceneRanges[index]
+  if (!scene?.story?.length || !range) return []
+  return scene.story.map((beat) => ({
+    ...beat,
+    sceneIndex: index,
+    from: range.from + range.span * beat.from,
+    to: range.from + range.span * beat.to,
+  }))
+}
+
+/**
+ * The story beat active at a scene-local progress, with its weight.
+ *
+ * The weight peaks in the middle of the window and is exactly zero at both edges,
+ * so a part is never emphasised while the camera is arriving or leaving.
+ */
+export function focusAt(scene, at) {
+  if (!scene?.story?.length) return { part: null, weight: 0 }
+  const value = clamp01(at)
+  for (const beat of scene.story) {
+    if (value < beat.from || value > beat.to) continue
+    const span = Math.max(beat.to - beat.from, 1e-6)
+    const u = (value - beat.from) / span
+    /* sin^0.8: wide hold, gentle edges. 0 at u = 0 and u = 1. */
+    const weight = Math.pow(Math.sin(Math.PI * clamp01(u)), 0.8)
+    return { part: beat.part, weight }
+  }
+  return { part: null, weight: 0 }
+}
+
+/** The beat window for the DOM: which caption is showing, and how strongly. */
+export const storyFor = (sceneId) => {
+  const index = sceneRanges.findIndex((range) => range.id === sceneId)
+  const scene = scenes[index]
+  return scene?.story ? storyBeats(scene, index) : []
 }
 
 /* ------------------------------------------------------------------ *
@@ -379,6 +454,10 @@ export default {
   blendKeyframes,
   screenStates,
   getScreenState,
+  sceneLocalAt,
+  focusAt,
+  storyBeats,
+  storyFor,
   overlayOpacityFor,
   navProgressTargets,
   sectionIdOf,

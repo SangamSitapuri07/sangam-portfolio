@@ -82,6 +82,7 @@ try {
   } = await server.ssrLoadModule('/src/lib/timeline.js')
   const { scenes } = await server.ssrLoadModule('/src/config/scenes.js')
   const { createSilhouette } = await server.ssrLoadModule('/src/lib/silhouette.js')
+const { createSubjectPicker } = await server.ssrLoadModule('/src/lib/subject.js')
   const { createExplodedView } = await server.ssrLoadModule('/src/lib/explodedView.js')
 
   const file = await readFile(path.join(root, 'public/models/cyberpunk_laptop.glb'))
@@ -96,8 +97,11 @@ try {
   /* The camera is fitted to whatever the machine currently occupies, so the
      purity check has to pose the machine at the same progress before resolving
      the lens — exactly as the director does each frame. */
-  const silhouette = createSilhouette(rig.machine)
+  const silhouette = createSilhouette(rig.machine, { assembled: rig.assembled })
   const exploded = createExplodedView(rig)
+  /* The film frames each shot on its own subject (`fit`/`focus`), so a check that
+     frames every key on the whole silhouette is measuring a different film. */
+  const pickSubject = createSubjectPicker({ silhouette, exploded })
   const poseAt = (pose) => {
     rig.machine.position.set(...pose.position)
     rig.machine.rotation.set(...pose.rotation)
@@ -115,9 +119,9 @@ try {
 
   const targetAt = (p, out) => {
     const { a, b, t } = findSegment(keyframes, p)
-    const subject = poseAt(blendKeyframes(a, b, t, {}))
-    const ca = resolveCameraAt(a, subject, 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
-    const cb = resolveCameraAt(b, subject, 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
+    poseAt(blendKeyframes(a, b, t, {}))
+    const ca = resolveCameraAt(a, pickSubject(a), 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
+    const cb = resolveCameraAt(b, pickSubject(b), 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
     for (let i = 0; i < 3; i += 1) {
       out.pos[i] = ca.pos[i] + (cb.pos[i] - ca.pos[i]) * t
       out.target[i] = ca.target[i] + (cb.target[i] - ca.target[i]) * t

@@ -14,10 +14,11 @@
  * distance, and the machine keeps its place in the frame instead of cropping on
  * one screen and shrinking to a speck on another.
  *
- * The stage rectangles are the half of the design that is *not* negotiable — they
- * are where the copy isn't. Desktop: copy in the left 50%; phone: copy in the
- * bottom half. `tools/preview-composition.mjs` asserts every key still obeys this
- * against the real geometry.
+ * The machine is the film, so it is framed *full bleed*: `full` is the whole
+ * viewport (with a little bleed allowed at the edges), and the copy floats over it
+ * on a scrim. The `copy` rectangle beside each stage is therefore no longer "the
+ * place the machine may not go" — it is the rectangle the shield has to keep dark
+ * enough to read against, and `config/scrim.js` is checked against it.
  *
  * Pure maths, no three.js, so the config, the director, the still previews and the
  * composition check all share one implementation.
@@ -28,10 +29,37 @@ const DEG = Math.PI / 180
 /**
  * Where the machine may sit. Screen fractions: x from the left, y from the top.
  *
- * `split`  — copy on the left (desktop) or below (phone); machine opposite.
- * `banner` — copy underneath the machine, used for the closing footer line.
+ * `full`   — the whole viewport; the machine is the background and the copy sits
+ *            over it on a scrim. This is the film's default.
+ * `split`  — machine on one side, copy on the other. Kept for the loader/intro and
+ *            for any shot that genuinely needs clear space beside the machine.
+ * `banner` — copy underneath a centred machine, used for the closing line.
+ *
+ * `copy` is where the words go, in screen fractions, and it is shared with the
+ * shield in `config/scrim.js` — one definition for the DOM, the canvas and the
+ * checks.
  */
 export const stages = {
+  full: {
+    /* Slightly larger than the viewport: the machine is allowed to bleed past the
+       edges, which is what makes it read as the background rather than a picture
+       frame sitting in the middle of one. */
+    desktop: { left: -0.04, right: 1.04, top: -0.06, bottom: 1.06 },
+    /* Portrait gets the same treatment: the machine is the background there too,
+       and the upper third stays the calmest part of the frame because the copy
+       sits low and the shield covers it. Confining the film to the top of a phone
+       shrank it to a band, which is the picture-in-a-box look this rewrite is
+       removing. */
+    mobile: { left: -0.14, right: 1.14, top: -0.04, bottom: 1.04 },
+    copy: {
+      /* Bottom-left on a desktop: the calmest part of the frame once the machine
+         is lit from the front, and the part a reader's eye reaches last. */
+      desktop: { left: 0.045, right: 0.46, top: 0.4, bottom: 0.94 },
+      /* A phone has less room, so the words start higher — the shield is already
+         near-opaque by 52% of the height, which the composition check verifies. */
+      mobile: { left: 0.05, right: 0.95, top: 0.52, bottom: 0.97 },
+    },
+  },
   split: {
     desktop: { left: 0.47, right: 0.995, top: 0.05, bottom: 0.95 },
     mobile: { left: 0.05, right: 0.95, top: 0.07, bottom: 0.5 },
@@ -68,12 +96,35 @@ export const copyZoneFor = (stage, variant = 'desktop') => {
  * @param {number} [options.fill]      fraction of the stage the machine should fill
  * @param {number} [options.dolly]     how many subject-radii away the lens sits
  */
-export const frame = ({ azimuth = 0, elevation = 10, stage = 'split', fill = 0.92, dolly = 3.4 } = {}) => ({
+export const frame = ({
+  azimuth = 0,
+  elevation = 10,
+  stage = 'full',
+  fill = 0.95,
+  dolly = 3.4,
+  /* Which subject the lens is fitted to:
+     `all`  — the machine as posed, exploded parts included. Correct for a wide
+              shot where every flying component should stay in frame.
+     `core` — the assembled envelope, carried along by the machine's transform.
+              The chassis fills the screen and the parts fly *out* of frame, which
+              is what makes a teardown feel like it is happening around you rather
+              than shrinking away. */
+  fit = 'all',
+  /* A story beat: the id of a part in `config/parts.js`. The key does not re-frame
+     the shot around that part — the framing stays on the machine, so the teardown
+     plays as one continuous take — it pulls the aim point toward the part, by
+     `aim` of the way (see `lib/subject.js`). */
+  focus = null,
+  aim = 0.42,
+} = {}) => ({
   azimuth,
   elevation,
   stage,
   fill,
   dolly,
+  fit,
+  focus,
+  aim,
 })
 
 /**

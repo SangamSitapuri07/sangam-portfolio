@@ -54,18 +54,24 @@ A camera is written as intent, not coordinates:
 frame({ azimuth: -20, elevation: 12, stage: 'split', fill: 0.94, dolly: 3.5 })
 ```
 
-"From twenty degrees to the machine's left and twelve degrees above it, fitted into
-the copy-free part of the viewport, filling 94% of it, with the lens three and a
-half subject-radii away." `lib/framing.js` resolves that against the machine's
-*measured silhouette* every frame, solving the lens and the aim point so the
-machine fills its stage without cropping. The stages — where the copy is not — are
-defined once, beside the copy rectangles the DOM uses.
+"From twenty degrees to the machine's left and twelve degrees above it, filling the
+whole viewport, with the lens three and a half subject-radii away." `lib/framing.js`
+resolves that against the machine's *measured silhouette* every frame, solving the
+lens and the aim point so the machine fills the frame without a second set of
+hand-tuned numbers per screen.
 
-That is why the composition survives an ultrawide monitor and a phone without a
-second set of hand-tuned camera numbers, and why an exploded view automatically
-pulls the camera back: the silhouette grew. `tools/preview-composition.mjs` proves
-it against the real geometry by projecting every mesh into screen space and
-asserting that no shot covers its copy column.
+The machine is the film's background, not an illustration beside the text: every
+scene is framed `stage: 'full'`, and the copy floats over it on a shield. That
+shield is a measured thing, not a mood — `config/scrim.js` defines its stops,
+`components/CopyShield.jsx` paints them, and `tools/preview-composition.mjs`
+composites it over the brightest surface a scene can put behind the words (the
+emissive display) to prove every caption clears 4.5:1. The same tool projects the
+subject into screen space and asserts every shot fills the frame and stays centred.
+
+Story beats go further: a key can name a part, and Scene 03 stops on the display,
+the keyboard, the deck and the bottom shell in turn. The camera aims at the part,
+the part travels further out of the machine, and a caption fades in — all three
+reading one number from the timeline, so they cannot drift apart.
 
 Two rules keep the film from feeling like ten clips:
 
@@ -123,8 +129,8 @@ npm run lint       # eslint, no errors
 
 | Command | What it proves |
 | --- | --- |
-| `verify:content` | 779 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
-| `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that no wide shot parks the machine under the copy column |
+| `verify:content` | 953 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
+| `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that every shot keeps the machine and its display in frame |
 | `verify:dom` | Boots the app in jsdom: zero console errors, one `h1`, working fallback links |
 | `verify:screens` | Paints every screen at every quality tier: correct copy, not blank, no overlapping text, no text off the panel, no glyph outside the font |
 | `verify:film` | Runs the real director against the real rig: the storyboard is a pure function of progress, scrubbing backwards lands on the same pose, no scene boundary jump-cuts the camera, a drag turns the machine but leaves the camera exactly where the storyboard put it, and no React state is written from a frame callback |
@@ -133,10 +139,14 @@ npm run lint       # eslint, no errors
 `verify:screens` writes previews to `.qa/screens/` (git-ignored) so the panels can
 be looked at without a browser.
 
-Two composition tools cover what the suites above cannot: `node
+Two composition tools cover what the suites above cannot (both write to `.qa/`,
+which is git-ignored): `node
 tools/preview-film.mjs` (add `--variant=mobile`) renders a storyboard of every
-scene through the real director, and `node tools/preview-composition.mjs` projects
-the machine into screen space and prints where it sits against the copy column.
+scene through the real director, and `node tools/preview-composition.mjs` reports,
+per shot, how much of the frame the machine covers and the worst-case contrast of
+the copy sitting on the shield. `node tools/preview-film.mjs --page` goes one
+further and paints the shield and a stand-in for the DOM copy over each still, so
+the composed page can be looked at without a browser.
 
 None of this watches the film animate, measures a real frame rate, or hears a
 screen reader — that pass needs a browser and is written up as a checklist in

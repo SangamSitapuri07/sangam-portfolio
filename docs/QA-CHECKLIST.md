@@ -1,6 +1,6 @@
 # QA checklist — the pass that needs a real browser
 
-Everything in this repository is machine-checked by `npm run verify` (779 content
+Everything in this repository is machine-checked by `npm run verify` (953 content
 assertions, the rig, the painter, the film, contrast). This document is the other
 half: the things a headless sandbox cannot judge, in priority order. Budget
 **20 minutes** for the required sections, an hour for all of it.
@@ -43,9 +43,14 @@ This has never been seen running. It is the single biggest unknown.
 
 Scroll from top to bottom, slowly, then back up.
 
-**Correct:** one continuous camera move through seven chapters — intro, hero,
-about, skills, five project beats, experience, contact. The copy blocks fade in
-and out. The scroll feels smoothed, not stepped.
+**Correct:** one continuous camera move through ten scenes — awakening, engine,
+breakdown, core, universe, deep-dive, rebuild, beyond, transmission, afterglow.
+The laptop fills the viewport at every size and the copy sits over it on the
+shield. The copy blocks fade in and out. The scroll feels smoothed, not stepped.
+
+In Scene 03 the film should stop on the display, the keyboard, the deck and the
+bottom shell in turn, with the caption changing in step; Scene 07 reassembles the
+same parts.
 
 **Wrong:** a blank or black canvas; a frozen image; the camera jumping between
 two positions; the copy stacked on top of itself; nothing responding to scroll.
@@ -185,11 +190,14 @@ whether it *feels* right — not stopping awkwardly early or overshooting.
 
 Drag the window from full width down to phone width, mid-scene.
 
-**Correct:** the layout reflows, text stays inside its column, nothing overlaps.
-The film switches between its desktop and mobile camera paths.
+**Correct:** the layout reflows and the copy stays readable. The machine keeps
+filling the frame — the copy is *meant* to sit over it — and the shield behind the
+words stays dark enough on every scene, including where the display is at its
+brightest. The film switches between its desktop and mobile camera paths.
 
-**Wrong:** copy overlapping the machine; the display's text running into a pane
-seam; a stage that stays desktop-sized on a narrow window.
+**Wrong:** the machine shrinking into a small box with a caption beside it; words
+sitting on a bright display with no shield; a stage that stays desktop-sized on a
+narrow window; the caption lagging behind the part the camera is on.
 
 ## 11b · The demo environment
 
@@ -281,7 +289,7 @@ PR #1.
 
 | Fact | Value |
 | --- | --- |
-| Content assertions | 779, plus copy hygiene over 277 strings |
+| Content assertions | 953, plus copy hygiene over 277 strings |
 | Screens checked | 15 canvases × 3 quality tiers |
 | Director CPU cost | 0.015 ms p95 of a 16.7 ms frame |
 | Reversal agreement | 8×10⁻¹² worst case over 6 checkpoints |

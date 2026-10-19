@@ -24,16 +24,21 @@ import { parallax as parallaxConfig } from '@/config/laptop'
 import { defaultAnchors } from '@/lib/anchors'
 import { createExplodedView } from '@/lib/explodedView'
 import { createSilhouette } from '@/lib/silhouette'
+import { createSubjectPicker } from '@/lib/subject'
 import { interaction } from '@/lib/interaction'
+import { scenes } from '@/config/scenes'
 import {
   buildKeyframes,
   findSegment,
   resolveCameraAt,
   blendKeyframes,
   getScreenState,
+  sceneLocalAt,
+  focusAt,
 } from '@/lib/timeline'
 
 const ANCHOR_KEYS = Object.keys(defaultAnchors)
+const SCENE_INDEX = Object.fromEntries(scenes.map((scene, index) => [scene.id, index]))
 
 /** Machine silhouette, in world space, for the auto-framing camera. */
 const emptySubject = { centre: [0, 0.85, 0], min: [-1.02, 0, -0.9], max: [1.02, 1.7, 0.9] }
@@ -59,6 +64,10 @@ export function createDirector({
   const camB = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32 }
   const camHero = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32 }
   const blended = {}
+  /* One subject per keyframe, reused every frame: the camera is resolved for the
+     shot it is leaving and the shot it is arriving at, and each may be framed to a
+     different thing (the whole machine, its core, or a single part). */
+  let pickSubject = () => emptySubject
   const vec = new THREE.Vector3()
   const anchorMatrix = new THREE.Matrix4()
   const anchorScratch = ANCHOR_KEYS.map(() => new THREE.Vector3())
@@ -89,6 +98,8 @@ export function createDirector({
     projectIndex: -1,
     screenKey: null,
     keyframe: null,
+    /** The component the copy is talking about right now (Scene 03 and friends). */
+    focus: { part: null, weight: 0 },
   }
 
   /* Publish the film on the shared state object too: DOM writers and the
@@ -127,7 +138,8 @@ export function createDirector({
       if (laptopRig && laptopRig !== rig) {
         rig = laptopRig
         exploded = createExplodedView(laptopRig)
-        silhouette = createSilhouette(laptopRig.machine)
+        silhouette = createSilhouette(laptopRig.machine, { assembled: laptopRig.assembled })
+        pickSubject = createSubjectPicker({ silhouette, exploded })
       }
       if (lightRefs) lights = lightRefs
       return api
@@ -180,13 +192,23 @@ export function createDirector({
       /* ---- 4. World-space anchors ---- */
       measureWorldAnchors()
 
+      /* ---- 4b. Which part is speaking ----
+       * A pure function of this scene's own progress, so the DOM caption, the
+       * component's extra travel and the camera's push-in are all reading the same
+       * number. No damping: scrubbing backwards must land on the same part. */
+      const sceneIndex = SCENE_INDEX[a.sceneId] ?? 0
+      const scene = scenes[sceneIndex]
+      const focus = focusAt(scene, sceneLocalAt(sceneIndex, progress))
+      film.focus.part = focus.part
+      film.focus.weight = focus.weight
+
       /* ---- 5. Exploded view ----
        * Driven by one scalar, after the hinge, and before the drag offsets are
        * applied below — the parts belong to the machine, so they inherit the drag
        * rather than fighting it. */
       const explodeLambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.explode
       film.explode = damp(film.explode, target.explode, explodeLambda, dt)
-      exploded?.apply(film.explode)
+      exploded?.apply(film.explode, focus)
       if (rig) rig.machine.updateMatrixWorld(true)
 
       /* ---- 5a. Silhouette, *before* direct manipulation ----
@@ -199,7 +221,7 @@ export function createDirector({
         m.position.set(machine.posX + offset.posX, machine.posY + offset.posY, machine.posZ)
         m.updateMatrixWorld(true)
       }
-      const subject = silhouette ? silhouette.refresh() : emptySubject
+      if (silhouette) silhouette.refresh()
 
       /* ---- 5b. Direct manipulation ----
        * Absolute values, not increments: these are re-derived from the storyboard
@@ -224,8 +246,8 @@ export function createDirector({
        * pulls back and a reassembled one moves in without any extra keyframes,
        * and the composition stays inside its stage rectangle at any viewport. */
       const viewport = camera?.aspect || 16 / 9
-      resolveCameraAt(a, subject, viewport, variant, camA)
-      resolveCameraAt(b, subject, viewport, variant, camB)
+      resolveCameraAt(a, pickSubject(a), viewport, variant, camA)
+      resolveCameraAt(b, pickSubject(b), viewport, variant, camB)
 
       let posXTarget = camA.pos[0] + (camB.pos[0] - camA.pos[0]) * t
       let posYTarget = camA.pos[1] + (camB.pos[1] - camA.pos[1]) * t
@@ -237,7 +259,7 @@ export function createDirector({
 
       if (reducedMotion) {
         // Hold the hero framing; let the storyboard move by a whisper only.
-        resolveCameraAt(heroKey, subject, viewport, variant, camHero)
+        resolveCameraAt(heroKey, pickSubject(heroKey), viewport, variant, camHero)
         const scale = rmConfig.cameraTravelScale
         posXTarget = camHero.pos[0] + (posXTarget - camHero.pos[0]) * scale
         posYTarget = camHero.pos[1] + (posYTarget - camHero.pos[1]) * scale

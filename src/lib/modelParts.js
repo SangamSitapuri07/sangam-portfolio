@@ -285,6 +285,26 @@ export function assembleLaptop(source, { quality } = {}) {
     })
   })
 
+  /* ---- 8b. The assembled envelope ----
+   * The camera frames full-bleed shots to this: the machine as it was built,
+   * before any teardown. It has to be captured here rather than measured later,
+   * because "later" is after some other scene has already exploded the machine —
+   * which is how a rebuild ends up framing a cloud of parts and calling it the
+   * core. Stored in the machine's own space, so it follows the pose for free. */
+  const assembled = new THREE.Box3()
+  {
+    const toLocal = new THREE.Matrix4().copy(machine.matrixWorld).invert()
+    const relative = new THREE.Matrix4()
+    const meshBox = new THREE.Box3()
+    machine.traverse((child) => {
+      if (!child.isMesh || !child.geometry) return
+      if (!child.geometry.boundingBox) child.geometry.computeBoundingBox()
+      relative.multiplyMatrices(toLocal, child.matrixWorld)
+      meshBox.copy(child.geometry.boundingBox).applyMatrix4(relative)
+      assembled.union(meshBox)
+    })
+  }
+
   /* ---- 9. Screen textures (bound later, once the painter exists) ---- */
   const bindTexture = (mesh, texture) => {
     if (!mesh || !texture) return
@@ -325,6 +345,8 @@ export function assembleLaptop(source, { quality } = {}) {
     anchors,
     lift,
     bounds: { base: baseBox, machine: machineBox },
+    /** The machine's assembled envelope in machine-local space (see above). */
+    assembled,
     split,
     glass: glassMesh,
     setScreenTextures,

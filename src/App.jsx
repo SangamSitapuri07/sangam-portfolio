@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar'
 import ProgressBar from '@/components/ProgressBar'
 import ScrollHint from '@/components/ScrollHint'
 import SectionOverlay from '@/components/SectionOverlay'
+import CopyShield from '@/components/CopyShield'
 import FallbackPortfolio from '@/sections/FallbackPortfolio'
 import SceneBoundary from '@/components/SceneBoundary'
 import DemoLab from '@/components/DemoLab'
@@ -208,18 +209,9 @@ export default function App() {
         <FallbackPortfolio />
       )}
 
-      {/* Readability scrim under the copy on small screens, where the machine
-          sits above the text. */}
-      {!useStatic ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-10 h-[58%] md:hidden"
-          style={{
-            background:
-              'linear-gradient(to top, rgba(5,6,10,0.96) 0%, rgba(5,6,10,0.82) 34%, rgba(5,6,10,0.35) 68%, rgba(5,6,10,0) 100%)',
-          }}
-        />
-      ) : null}
+      {/* The machine is the background, so the copy always sits on the shield.
+          Measured, not decorative: see `config/scrim.js`. */}
+      {!useStatic ? <CopyShield variant={variant} /> : null}
 
       <Navbar
         activeSceneId={activeSceneId}

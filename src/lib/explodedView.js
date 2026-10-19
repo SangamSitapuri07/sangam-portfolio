@@ -210,13 +210,33 @@ export function createExplodedView(rig) {
   const scratchQuat = new THREE.Quaternion()
   const scratchVec = new THREE.Vector3()
 
-  const apply = (amount) => {
+  let lastAmount = 0
+
+  /**
+   * Pose every part.
+   *
+   * @param {number} amount 0 = assembled, 1 = fully broken down
+   * @param {{part?: string, weight?: number}} [emphasis] the part the copy is
+   *        talking about: it travels a little further out of the machine, so the
+   *        camera has something clearly separated to push in on. A pure function
+   *        of (amount, emphasis), like everything else here.
+   */
+  const apply = (amount, emphasis = null) => {
     const a = amount <= 0 ? 0 : amount >= 1 ? 1 : amount
+    lastAmount = a
+    const focusId = emphasis?.part || null
+    const focusWeight = emphasis?.weight > 0 ? Math.min(emphasis.weight, 1) : 0
 
     for (const entry of entries) {
       const t = unitProgress(entry.unit, a)
       /* Rotation slerped from identity, so t = 0 is exactly no rotation. */
       scratchQuat.copy(identity).slerp(entry.rotation, t)
+
+      /* The part that is speaking travels 45% further than its neighbours at the
+         peak of its beat. It is the same offset it already has, so it reads as the
+         same assembly being opened a little wider — not a second animation. */
+      const emphasisNow =
+        entry.unit.id === focusId ? t * (1 + focusWeight * 0.45) : t
 
       for (const item of entry.objects) {
         /* p = rest + offset·t + (R(t) − I)·(rest − centre) */
@@ -224,7 +244,7 @@ export function createExplodedView(rig) {
         item.object.position
           .copy(item.rest.position)
           .add(scratchVec.sub(item.rest.position).add(item.centre))
-          .addScaledVector(entry.offset, t)
+          .addScaledVector(entry.offset, emphasisNow)
         item.object.quaternion.copy(item.rest.quaternion).multiply(scratchQuat)
       }
     }
@@ -233,6 +253,10 @@ export function createExplodedView(rig) {
   return {
     apply,
     units: entries.map((entry) => ({ id: entry.unit.id, meshes: entry.objects.length })),
+    /** The live objects of one unit — the camera needs them to frame a story beat. */
+    unitObjects: (id) => entries.find((entry) => entry.unit.id === id)?.objects.map((item) => item.object) || [],
+    /** How far the whole teardown has travelled, 0…1, for the checks. */
+    amount: () => lastAmount,
   }
 }
 

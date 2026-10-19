@@ -52,7 +52,7 @@ const { resolveCamera } = await server.ssrLoadModule('/src/lib/framing.js')
 
 const rig = await loadLaptopRig()
 const exploded = createExplodedView(rig)
-const silhouette = createSilhouette(rig.machine)
+const silhouette = createSilhouette(rig.machine, { assembled: rig.assembled })
 
 /* Flat-shade palette: the display is emissive, the glass is skipped (it is 5%
    transparent in the real renderer and would hide the screen here). */
@@ -64,16 +64,24 @@ rig.machine.traverse((mesh) => {
   meshes.push({ mesh, color: isScreen ? '#2ad9ef' : '#6d7787', emissive: isScreen })
 })
 
+const { scenes } = await server.ssrLoadModule('/src/config/scenes.js')
+const { chapters } = await server.ssrLoadModule('/src/data/chapters.js')
+const { partByUnit } = await server.ssrLoadModule('/src/config/parts.js')
+const { alphaAt } = await server.ssrLoadModule('/src/config/scrim.js')
+const { copyZoneFor } = await server.ssrLoadModule('/src/lib/framing.js')
+const { createSubjectPicker } = await server.ssrLoadModule('/src/lib/subject.js')
+const pickSubject = createSubjectPicker({ silhouette, exploded })
+
 const keys = timeline.buildKeyframes({ variant: args.variant === 'mobile' ? 'mobile' : 'desktop' })
 
 const variant = args.variant === 'mobile' ? 'mobile' : 'desktop'
 const aspect = variant === 'mobile' ? 9 / 16 : 16 / 9
 /** Put the machine in a keyframe's pose; returns its world silhouette. */
-function poseMachine(pose) {
+function poseMachine(pose, focus) {
   rig.machine.position.set(...pose.position)
   rig.machine.rotation.set(...pose.rotation)
   rig.applyLid(pose.lid)
-  exploded.apply(pose.explode)
+  exploded.apply(pose.explode, focus)
   rig.machine.updateMatrixWorld(true)
   return silhouette.refresh()
 }
@@ -82,15 +90,74 @@ function poseMachine(pose) {
 function poseAt(p) {
   const { a, b, t } = timeline.findSegment(keys, p)
   const pose = timeline.blendKeyframes(a, b, t, {})
-  const subject = poseMachine(pose)
-  const camA = resolveCamera(a.camera, subject, aspect, variant, { pos: [0, 0, 0], target: [0, 0, 0] })
-  const camB = resolveCamera(b.camera, subject, aspect, variant, { pos: [0, 0, 0], target: [0, 0, 0] })
+  const sceneIndex = scenes.findIndex((scene) => scene.id === a.sceneId)
+  const focus = timeline.focusAt(scenes[sceneIndex], timeline.sceneLocalAt(sceneIndex, p))
+  poseMachine(pose, focus)
+  const camA = resolveCamera(a.camera, pickSubject(a), aspect, variant, { pos: [0, 0, 0], target: [0, 0, 0] })
+  const camB = resolveCamera(b.camera, pickSubject(b), aspect, variant, { pos: [0, 0, 0], target: [0, 0, 0] })
   const lerp = (x, y) => x + (y - x) * t
   return {
     pose,
     camera: new THREE.Vector3(...camA.pos.map((v, i) => lerp(v, camB.pos[i]))),
     target: new THREE.Vector3(...camA.target.map((v, i) => lerp(v, camB.target[i]))),
     fov: lerp(camA.fov, camB.fov),
+  }
+}
+
+/**
+ * Paint the shield and a stand-in for the DOM copy over one cell.
+ *
+ * The stills show the 3D film; this shows the *page* — the copy sitting on the
+ * shield that `config/scrim.js` defines, at the rectangle `stages.full.copy` says
+ * it occupies. It is what the contrast check measures, made visible: if a line is
+ * unreadable here it is unreadable in the browser.
+ */
+function paintPage(ctx, cx, cy, p) {
+  const image = ctx.getImageData(cx, cy, W, H)
+  const data = image.data
+  const [rr, gg, bb] = [0x05, 0x06, 0x0a]
+  for (let y = 0; y < H; y += 1) {
+    for (let x = 0; x < W; x += 1) {
+      const a = alphaAt((x + 0.5) / W, (y + 0.5) / H, variant)
+      if (a <= 0) continue
+      const i = (y * W + x) * 4
+      data[i] = data[i] * (1 - a) + rr * a
+      data[i + 1] = data[i + 1] * (1 - a) + gg * a
+      data[i + 2] = data[i + 2] * (1 - a) + bb * a
+    }
+  }
+  ctx.putImageData(image, cx, cy)
+
+  const sceneIndex = timeline.getActiveSceneIndex(p)
+  const scene = scenes[sceneIndex]
+  const chapter = chapters[sceneIndex]
+  const zone = copyZoneFor('full', variant)
+  const x0 = cx + zone.left * W
+  const width = (zone.right - zone.left) * W
+  const bottom = cy + zone.bottom * H
+  const scale = variant === 'mobile' ? 0.62 : 1
+
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#5ef0ff'
+  ctx.font = `${Math.round(10 * scale)}px monospace`
+  ctx.fillText(`${chapter.number} · ${chapter.kicker}`.toUpperCase(), x0, bottom - 92 * scale)
+
+  ctx.fillStyle = '#eef2f9'
+  ctx.font = `600 ${Math.round(19 * scale)}px sans-serif`
+  const title = chapter.title.length > 44 ? `${chapter.title.slice(0, 42)}…` : chapter.title
+  ctx.fillText(title, x0, bottom - 66 * scale)
+
+  const local = timeline.sceneLocalAt(sceneIndex, p)
+  const focus = timeline.focusAt(scene, local)
+  const part = focus.part ? partByUnit[focus.part] : null
+  ctx.fillStyle = '#aeb7c6'
+  ctx.font = `${Math.round(12 * scale)}px sans-serif`
+  if (part) {
+    ctx.fillText(`${part.index} / ${part.pillar} — ${part.title}`, x0, bottom - 44 * scale)
+    ctx.fillText(part.line.slice(0, 58), x0, bottom - 26 * scale)
+  } else {
+    ctx.fillText(chapter.body.slice(0, Math.round(width / (6 * scale))), x0, bottom - 44 * scale)
   }
 }
 
@@ -109,6 +176,11 @@ async function renderSheet(progressList, out) {
     const cx = (i % COLS) * W
     const cy = Math.floor(i / COLS) * H
     ctx.drawImage(canvas, cx, cy)
+
+    if (args.page) {
+      paintPage(ctx, cx, cy, p)
+    }
+
     ctx.fillStyle = '#5ef0ff'
     ctx.font = '13px monospace'
     const scene = timeline.sceneRanges[timeline.getActiveSceneIndex(p)]

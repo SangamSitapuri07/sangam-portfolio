@@ -215,31 +215,19 @@ try {
   const { buildKeyframes, resolveCameraAt } = await server.ssrLoadModule('/src/lib/timeline.js')
   const { scenes: sceneConfig } = await server.ssrLoadModule('/src/config/scenes.js')
 
-  /* Which side the copy sits on, and whether the shot is deliberately a close-up
-     of the display (in which case the machine sitting behind the copy is the look,
-     not a defect) — both come from the scene config, never from the test. */
-  const overlayAnchor = Object.fromEntries(
-    sceneConfig.map((scene) => [scene.id, scene.overlay?.anchor ?? 'center'])
-  )
-  const closeup = Object.fromEntries(sceneConfig.map((scene) => [scene.id, scene.framing === 'closeup']))
+  /* The machine is the background now: every shot frames it full-bleed and the
+     copy sits over it on the shield in `config/scrim.js`. So the old "must not put
+     the machine under the copy" rule has been retired — what still has to hold is
+     that the shot actually contains the machine, and that its display is somewhere
+     in frame, because the screen is the one part of the model carrying content. */
   const keys = buildKeyframes({ variant: 'desktop' })
   const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.05, 80)
   const target = new THREE.Vector3()
   const out = { pos: [0, 0, 0], target: [0, 0, 0] }
 
-  /* Where the copy sits on a 1440×900 desktop, in NDC. The film must not park a
-     glowing machine under a paragraph of body text. */
-  const TEXT_REGION = {
-    left: [-0.96, -0.16, -0.55, 0.55],
-    right: [0.16, 0.96, -0.55, 0.55],
-    center: null,
-  }
-
   console.log('\n▸ camera framing per keyframe (machine at rest)')
   let offscreen = 0
-  let overlaps = 0
-  const corners = []
-  for (let i = 0; i < 8; i += 1) corners.push(new THREE.Vector3())
+  let screenOffscreen = 0
   /* Framing is fitted to the machine's *shape*, so hand it the rest box. The
      per-shot composition (which uses each key's own exploded pose) is verified
      separately and far more strictly by tools/preview-composition.mjs. */
@@ -252,9 +240,8 @@ try {
     camera.updateProjectionMatrix()
     target.set(out.target[0], out.target[1], out.target[2])
     camera.lookAt(target)
-
     camera.updateMatrixWorld()
-    // Project the machine's centre and the display centre; both must be on screen.
+
     const machineCentre = new THREE.Vector3()
     const screenPoint = new THREE.Vector3(...rig.anchors.screen)
     const box = new THREE.Box3().setFromObject(rig.machine)
@@ -262,35 +249,20 @@ try {
 
     const p = screenPoint.clone().project(camera)
     const c = machineCentre.clone().project(camera)
-    const visible =
-      Math.abs(p.x) < 1.15 && Math.abs(p.y) < 1.15 && p.z < 1 && Math.abs(c.x) < 1.6 && c.z < 1
+    const visible = Math.abs(c.x) < 1.4 && Math.abs(c.y) < 1.4 && c.z < 1
+    const screenVisible = Math.abs(p.x) < 1.5 && Math.abs(p.y) < 1.5 && p.z < 1
     if (!visible) offscreen += 1
+    if (!screenVisible) screenOffscreen += 1
 
-    /* Composition is scored on two reliable points — the middle of the display and
-       the centre of the machine — because a bounding box at close range has
-       corners behind the camera that project to nonsense. The project beats
-       are deliberate close-ups (the screen is meant to sit behind the cards), so
-       they are reported but not scored. */
-    const region = TEXT_REGION[overlayAnchor[key.sceneId] ?? 'center']
-    const scored = Boolean(region) && !closeup[key.sceneId]
-    let clash = ''
-    if (region) {
-      const [rl, rr, rb, rt] = region
-      const inside = (point) =>
-        point.x > rl + 0.04 && point.x < rr - 0.04 && point.y > rb + 0.04 && point.y < rt - 0.04
-      if (inside(p) || (c.z < 1 && inside(c))) {
-        clash = scored ? '  ← covers the copy' : `  (close-up: display behind the ${overlayAnchor[key.sceneId]}-hand copy)`
-        if (scored) overlaps += 1
-      }
-    }
     console.log(
       `  ${String(key.sceneId).padEnd(11)} ${key.kind.padEnd(8)} ` +
         `cam[${out.pos.map((v) => v.toFixed(2)).join(', ')}] ` +
-        `screen ndc(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) copy ${String(overlayAnchor[key.sceneId]).padEnd(6)}` +
-        `${clash}${visible ? '' : '  ← off screen'}`
+        `lens ${out.fov.toFixed(0)}° screen ndc(${p.x.toFixed(2)}, ${p.y.toFixed(2)})` +
+        `${screenVisible ? '' : '  ← display off screen'}${visible ? '' : '  ← machine off screen'}`
     )
   }
-  check('no keyframe parks the machine under the copy', overlaps === 0, `(${overlaps} overlapping)`)
+  check('every shot keeps the machine in frame', offscreen === 0, `(${offscreen} off screen)`)
+  check('every shot keeps the display in frame', screenOffscreen === 0, `(${screenOffscreen} off screen)`)
 
   console.log(
     `\n${failures.length === 0 ? '✓ rig verified' : `✗ ${failures.length} check(s) failed`}\n`

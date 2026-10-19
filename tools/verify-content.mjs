@@ -57,6 +57,10 @@ const load = async (relative) => import(pathToFileURL(path.join(srcDir, relative
 
 /* ------------------------------------------------------------------ data */
 const { profile: person } = await load('data/profile.js')
+const { units } = await load('lib/explodedView.js')
+const { parts, partByUnit } = await load('config/parts.js')
+const { scrim, cssBackground, minAlphaOver } = await load('config/scrim.js')
+const { stages, copyZoneFor } = await load('lib/framing.js')
 const projectsModule = await load('data/projects.js')
 const skillsModule = await load('data/skills.js')
 const timelineModule = await load('data/timeline.js')
@@ -260,6 +264,46 @@ if (scenes.scenes.map((scene) => scene.id).join(',') !== SCENE_ORDER.join(',')) 
   failures.push(`scenes are not in the authored order: ${scenes.scenes.map((scene) => scene.id).join(', ')}`)
 }
 
+/* ------------------------------------------------------------------ shield
+ * The copy floats over the machine now, so the shield is load-bearing. Two ways it
+ * can fail silently: the numbers can stop covering the copy rectangle, and the CSS
+ * can be emitted in an order the browser clamps. Both are checked here.
+ */
+console.log('\n▸ the copy shield')
+for (const variant of ['desktop', 'mobile']) {
+  const zone = copyZoneFor('full', variant)
+  const min = minAlphaOver(zone, variant)
+  checks += 1
+  if (min < scrim.minAlpha) {
+    failures.push(`scrim.${variant}: only ${min.toFixed(3)} under the copy, needs ${scrim.minAlpha}`)
+  }
+  console.log(`  · ${variant.padEnd(8)} ${(min * 100).toFixed(0)}% minimum under the copy`)
+
+  /* Parse the two emitted gradients and assert the stop positions ascend, which is
+     the only thing standing between the wash and a hard band. */
+  const gradients = cssBackground(variant).split(/(?=linear-gradient)/).filter(Boolean)
+  checks += 1
+  if (gradients.length !== 2) failures.push(`scrim.${variant}: expected two gradients, got ${gradients.length}`)
+  for (const gradient of gradients) {
+    const positions = [...gradient.matchAll(/([\d.]+)%/g)].map((match) => parseFloat(match[1]))
+    checks += 1
+    if (positions.some((value, index) => index > 0 && value < positions[index - 1])) {
+      failures.push(`scrim.${variant}: a gradient stop moves backwards (${positions.join(', ')})`)
+    }
+  }
+}
+
+/* Every stage the storyboard uses has a copy rectangle, or the caption has nowhere
+   to sit and the composition check has nothing to measure. */
+for (const scene of scenes.scenes) {
+  for (const key of scene.keys) {
+    checks += 1
+    if (!stages[key.camera.stage]?.copy?.['desktop']) {
+      failures.push(`scenes[${scene.id}] uses stage '${key.camera.stage}' with no copy rectangle`)
+    }
+  }
+}
+
 /* Every chapter must exist for every scene, and every scene for every chapter:
    copy and camera work are separate files, so this is the seam that can drift. */
 checks += 1
@@ -305,10 +349,18 @@ scenes.scenes.forEach((scene) => {
         ...(field === 'dolly' ? { expect: (v) => v > 0.2 && v < 12 } : {}),
       })
     }
+    /* `full` is the film's default: the machine is the background. `split` and
+       `banner` survive for any shot that genuinely needs clear space beside it. */
     has(key.camera, 'stage', {
       type: 'string',
       label: `${at}.camera.stage`,
-      expect: (v) => v === 'split' || v === 'banner',
+      expect: (v) => v === 'full' || v === 'split' || v === 'banner',
+    })
+    has(key.camera, 'fit', {
+      type: 'string',
+      optional: true,
+      label: `${at}.camera.fit`,
+      expect: (v) => v === 'all' || v === 'core',
     })
     has(key.cameraMobile, 'stage', {
       type: 'string',
@@ -316,6 +368,39 @@ scenes.scenes.forEach((scene) => {
       label: `${at}.cameraMobile.stage`,
     })
   })
+  /* A `focus` key names a component the model actually has, and that component
+     must carry copy in `config/parts.js`; otherwise the shot aims at nothing and
+     the caption has nothing to say. */
+  for (const [index, key] of (scene.keys || []).entries()) {
+    if (!key.camera?.focus) continue
+    const label = `${where}.keys[${index}].camera.focus`
+    checks += 1
+    if (!units.some((unit) => unit.id === key.camera.focus)) {
+      failures.push(`${label} →  '${key.camera.focus}' is not a unit of the model`)
+    }
+    checks += 1
+    if (!partByUnit[key.camera.focus]) failures.push(`${label} →  no copy for '${key.camera.focus}'`)
+  }
+
+  /* Story beats: in order, non-overlapping, inside the scene, naming a real part. */
+  if (scene.story) {
+    checks += 1
+    if (!Array.isArray(scene.story) || scene.story.length === 0) {
+      failures.push(`${where}.story is present but empty`)
+    }
+    let previousTo = 0
+    for (const [index, beat] of (scene.story || []).entries()) {
+      const label = `${where}.story[${index}]`
+      checks += 1
+      if (!partByUnit[beat.part]) failures.push(`${label}.part →  no such part '${beat.part}'`)
+      checks += 1
+      if (!(beat.from >= previousTo && beat.to > beat.from && beat.to <= 1)) {
+        failures.push(`${label} spans ${beat.from}…${beat.to}, out of order or outside the scene`)
+      }
+      previousTo = beat.to ?? previousTo
+    }
+  }
+
   /* The first key is the scene's establishing shot: it must open on the frame. */
   checks += 1
   if (scene.keys?.[0]?.at !== 0) failures.push(`${where} does not start its key list at 0`)

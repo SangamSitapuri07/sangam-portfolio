@@ -87,7 +87,11 @@ function SceneSection({ index, scene, children }) {
       className="relative"
       style={{ height: `${scene.height}vh` }}
     >
-      <div className="sticky top-0 flex h-[100svh] w-full items-end justify-center px-5 pt-20 pb-6 sm:px-8 sm:pb-10 md:items-center md:justify-start">
+      {/* The machine is the frame, so the copy sits on the shield in the lower
+          left on a desktop and across the bottom on a phone — the two rectangles
+          `lib/framing.js` calls `copy`, which the composition check measures the
+          shield against. */}
+      <div className="sticky top-0 flex h-[100svh] w-full items-end justify-start px-5 pt-24 pb-8 sm:px-8 sm:pb-10 md:px-[4.5vw] md:pb-[7vh]">
         <div
           className={`mx-auto flex w-full max-w-[1600px] flex-col ${
             isBanner ? 'items-center' : 'items-stretch'
@@ -96,14 +100,20 @@ function SceneSection({ index, scene, children }) {
           <div
             ref={panelRef}
             className={`will-change-[opacity,transform] ${
-              isBanner ? 'w-full max-w-xl text-center' : 'w-full md:max-w-[42vw]'
+              isBanner
+                ? 'mx-auto w-full max-w-2xl text-center'
+                : 'w-full max-w-[40rem] md:max-w-[min(40rem,40vw)]'
             }`}
             style={{ opacity: index === 0 ? 1 : 0 }}
           >
             <div
-              /* Dense chapters can outgrow a phone's lower half; they scroll
-                 inside the panel rather than pushing the film around. */
-              className="max-h-[46svh] overflow-y-auto overscroll-contain pr-1 md:max-h-[88svh]"
+              /* The panel has to fit inside `stages.full.copy`, or its top lines
+                 climb into the part of the shield that fades out. Desktop: copy
+                 runs 40→94% of the height, and the panel is pinned 7vh off the
+                 bottom, so it gets 46svh. Mobile: 52→97%, pinned 2rem up, so 38.
+                 Dense chapters scroll inside the panel rather than push the film
+                 around. */
+              className="max-h-[38svh] overflow-y-auto overscroll-contain pr-1 md:max-h-[46svh]"
               data-lenis-prevent
             >
               {children}
