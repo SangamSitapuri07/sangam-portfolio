@@ -6,10 +6,11 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || (production ? 'http://127.0.0
 export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: true,
-  workers: 2,
+  // One software WebGL worker in CI avoids competing GPU contexts on shared runners.
+  workers: process.env.CI ? 1 : 2,
   timeout: 60000,
   expect: { timeout: 10000 },
-  reporter: 'list',
+  reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
     baseURL,
     browserName: 'chromium',
