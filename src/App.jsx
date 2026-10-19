@@ -1,0 +1,256 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import * as THREE from 'three'
+
+import Experience from '@/components/Experience'
+import Loader from '@/components/Loader'
+import Navbar from '@/components/Navbar'
+import ProgressBar from '@/components/ProgressBar'
+import ScrollHint from '@/components/ScrollHint'
+import SectionOverlay from '@/components/SectionOverlay'
+import CopyShield from '@/components/CopyShield'
+import FallbackPortfolio from '@/sections/FallbackPortfolio'
+import SceneBoundary from '@/components/SceneBoundary'
+import DemoLab from '@/components/DemoLab'
+
+import { detectDevice, probeWebGL, resolveDpr, tierDown } from '@/lib/device'
+import { onDemoRequest } from '@/lib/uiBus'
+import {
+  initScrollEngine,
+  onProgress,
+  onSceneChange,
+  startScroll,
+  stopScroll,
+  sceneState,
+} from '@/lib/scrollEngine'
+import { getScreenState, sceneRanges } from '@/lib/timeline'
+import { projects } from '@/data/projects'
+import { autoTune } from '@/config/quality'
+
+/**
+ * App — the composition root.
+ *
+ * Decides what this device can do (WebGL, quality tier, layout variant, motion
+ * preference), mounts the fixed WebGL stage, lays the scrollable text column on
+ * top of it, and gates the whole thing behind the loader. If WebGL is unavailable,
+ * or if the scene throws, it renders the static portfolio instead — same content,
+ * no canvas.
+ */
+
+/* Decide once, before the first render, so nothing flickers into the wrong mode. */
+const initialState = () => {
+  const device = detectDevice()
+  const webgl = probeWebGL()
+  return { device, webgl }
+}
+
+export default function App() {
+  const [{ device, webgl }] = useState(initialState)
+  const [quality, setQuality] = useState(device.tier)
+  const [forcedStatic, setForcedStatic] = useState(false)
+  const [sceneCrashed, setSceneCrashed] = useState(false)
+  const [loaderDone, setLoaderDone] = useState(false)
+  const [activeSceneId, setActiveSceneId] = useState('home')
+  const [variant, setVariant] = useState(device.variant)
+  /* Which project's demo environment is open, if any. Set from a click on a
+     project card or from a click on the laptop's display in the 3D scene. */
+  const [demoProjectId, setDemoProjectId] = useState(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('demo')
+  })
+
+  const tierDropped = useRef(false)
+  const useStatic = forcedStatic || sceneCrashed || !webgl.ok
+  /* Static mode has nothing to stream — no model, no textures — so the page is
+     ready as soon as it mounts. Without this the nav would wait on a loader that
+     is never rendered. Derived, not set from an effect: state set inside an
+     effect here would just cause a second render pass. */
+  const ready = loaderDone || useStatic
+
+  /* Falling back to the static page is not only for broken WebGL: a visitor on a
+     weak device can choose it, and the choice sticks for their whole session. */
+  const toggleStaticScene = useCallback(() => setForcedStatic((value) => !value), [])
+
+  /* Switching between the film and the plain page changes the document height,
+     which leaves the scroll position meaningless. Land on the section the visitor
+     was watching instead of wherever the browser clamped to. */
+  const wasStatic = useRef(useStatic)
+  useEffect(() => {
+    const changed = wasStatic.current !== useStatic
+    wasStatic.current = useStatic
+    if (!changed || !useStatic) return
+    document.getElementById(activeSceneId)?.scrollIntoView({ block: 'start' })
+  }, [useStatic, activeSceneId])
+
+  /* True while the pointer is over the laptop display, which turns the cursor
+     into an invitation to click. Fires on enter and leave only — never per
+     frame — so it is safe to keep in React state. */
+  const [screenHovered, setScreenHovered] = useState(false)
+
+  /* Which project the display is showing, so the click hint can name it. This
+     runs on every scroll tick, but it returns the previous object whenever the
+     project has not changed, so React bails out and nothing re-renders. */
+  const [currentProject, setCurrentProject] = useState(null)
+  useEffect(() => {
+    if (!ready || useStatic) return undefined
+    return onProgress((progress) => {
+      const id = getScreenState(progress).projectId
+      setCurrentProject((previous) => {
+        if (previous?.id === id) return previous
+        return projects.find((project) => project.id === id) ?? null
+      })
+    })
+  }, [ready, useStatic])
+
+  /* ---- Clicks that start in the 3D scene arrive here ---- */
+  useEffect(() => onDemoRequest((projectId) => setDemoProjectId(projectId)), [])
+
+  /* ---- Keep the layout variant honest across resizes ---- */
+  useEffect(() => {
+    const onResize = () => {
+      const width = window.innerWidth
+      setVariant(width < 768 ? 'mobile' : width < 1280 ? 'tablet' : 'desktop')
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  /* ---- Start the scroll engine once the film is ready ----
+   * Linking the engine only after load means the intro cannot be scrolled past
+   * while assets stream in, and ScrollTrigger measures a settled layout. */
+  useEffect(() => {
+    // The engine drives the film's chapters. In static mode the page is an
+    // ordinary document and must keep ordinary scrolling.
+    if (!ready || useStatic) return undefined
+    initScrollEngine({ reducedMotion: device.reducedMotion })
+    startScroll()
+    const unsubscribe = onSceneChange((index) => {
+      const scene = sceneRanges[index]
+      if (!scene) return
+      const navScene = scene.id === 'intro' ? 'home' : scene.id
+      setActiveSceneId(navScene)
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [ready, useStatic, device.reducedMotion])
+
+  /* While loading, the page must not scroll behind the loader. */
+  useEffect(() => {
+    if (ready || useStatic) return undefined
+    stopScroll()
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [ready, useStatic])
+
+  /* ---- One automatic quality step down if the first seconds are slow ---- */
+  const handlePerformanceDrop = useCallback(() => {
+    if (tierDropped.current || !autoTune.enabled) return
+    tierDropped.current = true
+    setQuality((current) => tierDown(current))
+  }, [])
+
+  const dpr = useMemo(() => resolveDpr(quality, variant), [quality, variant])
+
+  const handleSceneReady = useCallback(() => {
+    if (import.meta.env?.DEV) {
+      // Handy when tuning scenes by hand.
+      window.__scene = { sceneState, ranges: sceneRanges }
+    }
+  }, [])
+
+  return (
+    <>
+      <a
+        href="#main-content"
+        className="sr-only-focusable fixed top-4 left-4 z-[80] rounded-full bg-accent px-4 py-2 text-sm font-medium text-[#04101f]"
+      >
+        Skip to content
+      </a>
+
+      {/* ---------------- The film ---------------- */}
+      {!useStatic ? (
+        <div className="canvas-layer" aria-hidden="true">
+          <SceneBoundary onError={() => setSceneCrashed(true)}>
+            <Canvas
+              dpr={dpr}
+              gl={{
+                antialias: quality.id !== 'low',
+                alpha: false,
+                powerPreference: 'high-performance',
+                stencil: false,
+                depth: true,
+              }}
+              camera={{ fov: 32, near: 0.05, far: 80, position: [0, 1.2, 4.5] }}
+              shadows={quality.shadows}
+              frameloop="always"
+              onCreated={({ gl, scene }) => {
+                gl.setClearColor('#05060a', 1)
+                gl.toneMapping = THREE.ACESFilmicToneMapping
+                gl.toneMappingExposure = 1.05
+                scene.fog = new THREE.FogExp2('#05060a', 0.045)
+              }}
+            >
+              <Experience
+                quality={quality}
+                variant={variant}
+                reducedMotion={device.reducedMotion}
+                onSceneReady={handleSceneReady}
+                onPerformanceDrop={handlePerformanceDrop}
+                onHoverChange={setScreenHovered}
+              />
+            </Canvas>
+          </SceneBoundary>
+        </div>
+      ) : (
+        <FallbackPortfolio />
+      )}
+
+      {/* The machine is the background, so the copy always sits on the shield.
+          Measured, not decorative: see `config/scrim.js`. */}
+      {!useStatic ? <CopyShield variant={variant} /> : null}
+
+      <Navbar
+        activeSceneId={activeSceneId}
+        ready={ready}
+        staticMode={useStatic}
+        onToggleStatic={webgl.ok && !sceneCrashed ? toggleStaticScene : null}
+      />
+
+      {!useStatic ? (
+        <>
+          <ProgressBar ready={ready} />
+          <ScrollHint ready={ready} />
+        </>
+      ) : null}
+
+      {/* The film's chapters only exist when the film is running: in static mode
+          the fallback above IS the content, and rendering both would duplicate
+          every heading (and the h1) for readers and crawlers alike. */}
+      {!useStatic ? <SectionOverlay /> : null}
+
+      {!useStatic ? <Loader onComplete={() => setLoaderDone(true)} /> : null}
+
+      {/* Discoverability: a clickable display nobody knows is clickable is not an
+          interaction. Appears only while the pointer is actually on the panel. */}
+      {screenHovered && !demoProjectId ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-4"
+        >
+          <span className="rounded-full border border-accent/40 bg-void/85 px-4 py-2 text-[0.75rem] font-medium text-accent-bright backdrop-blur-md">
+            {currentProject
+              ? `Click the display to run ${currentProject.name}`
+              : 'Click the display'}
+          </span>
+        </div>
+      ) : null}
+
+      {/* The demo environment sits above everything, film or plain page. */}
+      <DemoLab projectId={demoProjectId} onClose={() => setDemoProjectId(null)} />
+    </>
+  )
+}

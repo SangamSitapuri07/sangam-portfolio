@@ -1,232 +1,92 @@
-// Skills Data
-// Used in the Neural Network visualization
-// Update proficiency levels and add skills anytime
+/**
+ * Skills — drawn from the CV's SKILLS section, plus tools the CV's own project
+ * descriptions name (the AI Debate Coach bullet says React Three Fiber; the Nuno
+ * tech line says PostgreSQL). Nothing here comes from a repository README, and
+ * nothing is aspirational.
+ *
+ * The CV lists: Languages — C++, C, Java, JavaScript, Python. Tools —
+ * ReactJS, NodeJS, MongoDB, Express.js, Mongoose, VS Code, GitHub, Flutter,
+ * Kotlin, SQL. Soft skills — problem-solving, teamwork, time management,
+ * adaptability, quick learner.
+ */
 
-export const SKILLS = {
-  // Core skill clusters - these are the BIG nodes
-  coreNodes: [
-    {
-      id: 'fullstack',
-      label: 'Full Stack',
-      position: [0, 0, 0],
-      color: '#4a90d9',
-      size: 1.5,
-      description: 'Building complete web experiences',
-      children: [
-        {
-          id: 'react',
-          label: 'React',
-          proficiency: 85,
-          color: '#61dafb',
-          projects: ['ai-debate-coach'],
-        },
-        {
-          id: 'nextjs',
-          label: 'Next.js',
-          proficiency: 80,
-          color: '#ffffff',
-          projects: ['portfolio'],
-        },
-        {
-          id: 'javascript',
-          label: 'JavaScript',
-          proficiency: 90,
-          color: '#f7df1e',
-          projects: ['dot-connect', 'ai-debate-coach'],
-        },
-        {
-          id: 'nodejs',
-          label: 'Node.js',
-          proficiency: 80,
-          color: '#68a063',
-          projects: ['dot-connect', 'ai-debate-coach'],
-        },
-        {
-          id: 'html-css',
-          label: 'HTML/CSS',
-          proficiency: 90,
-          color: '#e34c26',
-          projects: ['dot-connect'],
-        },
-        {
-          id: 'tailwind',
-          label: 'Tailwind',
-          proficiency: 85,
-          color: '#06b6d4',
-          projects: ['portfolio'],
-        },
-      ],
-    },
+export const skillCategories = [
+  {
+    id: 'frontend',
+    title: 'Frontend',
+    note: 'Interfaces that stay fast while they animate.',
+    accent: '#4B8CFF',
+    items: ['React', 'JavaScript', 'Three.js'],
+    also: ['React Three Fiber', 'Component architecture'],
+  },
+  {
+    id: 'backend',
+    title: 'Backend',
+    note: 'APIs and data models that hold up under real use.',
+    accent: '#54E0A0',
+    items: ['Node.js', 'Express.js', 'MongoDB', 'Mongoose'],
+    also: ['PostgreSQL', 'Server-side validation', 'Rating & ranking systems'],
+  },
+  {
+    id: 'programming',
+    title: 'Programming',
+    note: 'The fundamentals behind every framework.',
+    accent: '#FFB25E',
+    items: ['C', 'C++', 'Java', 'Python', 'SQL'],
+    also: ['200+ problems on LeetCode & GeeksforGeeks', '4★ HackerRank Python'],
+  },
+  {
+    id: 'development',
+    title: 'Development',
+    note: 'Shipping, versioning and the tools around the code.',
+    accent: '#7C5CFF',
+    items: ['Kotlin', 'Android', 'Flutter'],
+    also: ['GitHub', 'VS Code', 'Render'],
+  },
+]
 
-    {
-      id: 'android',
-      label: 'Android',
-      position: [3, 1, -1],
-      color: '#3ddc84',
-      size: 1.4,
-      description: 'Native Android development',
-      children: [
-        {
-          id: 'java',
-          label: 'Java',
-          proficiency: 90,
-          color: '#f89820',
-          projects: ['news-pinch', 'cafe-billing', 'polity-notes'],
-        },
-        {
-          id: 'android-studio',
-          label: 'Android Studio',
-          proficiency: 90,
-          color: '#3ddc84',
-          projects: ['news-pinch', 'cafe-billing', 'polity-notes'],
-        },
-        {
-          id: 'xml',
-          label: 'XML',
-          proficiency: 85,
-          color: '#ff6b6b',
-          projects: ['news-pinch', 'cafe-billing', 'polity-notes'],
-        },
-        {
-          id: 'sqlite',
-          label: 'SQLite',
-          proficiency: 80,
-          color: '#003b57',
-          projects: ['cafe-billing', 'polity-notes'],
-        },
-        {
-          id: 'firebase',
-          label: 'Firebase',
-          proficiency: 80,
-          color: '#ffca28',
-          projects: ['news-pinch'],
-        },
-      ],
-    },
+/** Language chips shown in the About scene as a quiet backstop — the CV's list. */
+export const coreLanguages = ['C++', 'C', 'Java', 'JavaScript', 'Python']
 
-    {
-      id: 'realtime',
-      label: 'Real-time',
-      position: [-3, 1, -1],
-      color: '#8b5cf6',
-      size: 1.2,
-      description: 'Real-time and multiplayer systems',
-      children: [
-        {
-          id: 'socketio',
-          label: 'Socket.io',
-          proficiency: 75,
-          color: '#010101',
-          projects: ['dot-connect'],
-        },
-        {
-          id: 'websockets',
-          label: 'WebSockets',
-          proficiency: 70,
-          color: '#4a90d9',
-          projects: ['dot-connect'],
-        },
-      ],
-    },
+export default skillCategories
 
-    {
-      id: 'ai',
-      label: 'AI & 3D',
-      position: [0, 3, -1],
-      color: '#f59e0b',
-      size: 1.3,
-      description: 'AI integration and 3D experiences',
-      children: [
-        {
-          id: 'threejs',
-          label: 'Three.js',
-          proficiency: 70,
-          color: '#049ef4',
-          projects: ['ai-debate-coach', 'portfolio'],
-        },
-        {
-          id: 'r3f',
-          label: 'React Three Fiber',
-          proficiency: 65,
-          color: '#000000',
-          projects: ['portfolio'],
-        },
-        {
-          id: 'ai-apis',
-          label: 'AI APIs',
-          proficiency: 75,
-          color: '#ff6f00',
-          projects: ['ai-debate-coach'],
-        },
-      ],
-    },
-
-    {
-      id: 'creative',
-      label: 'Creative',
-      position: [0, -3, 0],
-      color: '#ffd700',
-      size: 1.0,
-      description: 'Design and creative skills',
-      children: [
-        {
-          id: 'ui-design',
-          label: 'UI/UX Design',
-          proficiency: 80,
-          color: '#ff78c4',
-          projects: ['news-pinch', 'cafe-billing'],
-        },
-        {
-          id: 'problem-solving',
-          label: 'Problem Solving',
-          proficiency: 90,
-          color: '#10b981',
-          projects: ['dot-connect', 'ai-debate-coach'],
-        },
-        {
-          id: 'algorithms',
-          label: 'Algorithms',
-          proficiency: 80,
-          color: '#ec4899',
-          projects: ['dot-connect'],
-        },
-      ],
-    },
-  ],
-
-  // Connections between skills (synapse lines)
-  connections: [
-    { from: 'react', to: 'nextjs', strength: 0.9 },
-    { from: 'react', to: 'javascript', strength: 1.0 },
-    { from: 'nextjs', to: 'react', strength: 0.95 },
-    { from: 'javascript', to: 'nodejs', strength: 0.85 },
-    { from: 'html-css', to: 'tailwind', strength: 0.9 },
-    { from: 'java', to: 'android-studio', strength: 1.0 },
-    { from: 'android-studio', to: 'xml', strength: 0.95 },
-    { from: 'java', to: 'sqlite', strength: 0.7 },
-    { from: 'android-studio', to: 'firebase', strength: 0.8 },
-    { from: 'socketio', to: 'nodejs', strength: 0.9 },
-    { from: 'websockets', to: 'socketio', strength: 0.95 },
-    { from: 'threejs', to: 'r3f', strength: 0.95 },
-    { from: 'r3f', to: 'react', strength: 0.9 },
-    { from: 'threejs', to: 'javascript', strength: 0.85 },
-    { from: 'ai-apis', to: 'nodejs', strength: 0.7 },
-    { from: 'ui-design', to: 'html-css', strength: 0.7 },
-    { from: 'problem-solving', to: 'algorithms', strength: 0.9 },
-  ],
-}
-
-// Helper: Get all skills as flat array
-export const getAllSkills = () => {
-  return SKILLS.coreNodes.flatMap(node => node.children)
-}
-
-// Helper: Get skill by ID
-export const getSkillById = (id) => {
-  return getAllSkills().find(s => s.id === id)
-}
-
-// Helper: Get skills used in a project
-export const getSkillsForProject = (projectId) => {
-  return getAllSkills().filter(s => s.projects.includes(projectId))
-}
+/**
+ * The Engineering Core — scene 04's three columns.
+ *
+ * Deliberately three, not four: the scene's whole argument is "the language, the
+ * interface, and the thinking that holds them together". Everything listed is
+ * from the CV's SKILLS section; the descriptions say what the skill is *for*, not
+ * how good I am at it.
+ */
+export const coreGroups = [
+  {
+    id: 'programming',
+    number: '01',
+    title: 'Programming',
+    note: 'The language layer: data structures, memory and the fundamentals that outlive frameworks.',
+    accent: '#FFB25E',
+    items: ['C', 'C++', 'Java', 'Python', 'SQL'],
+    detail:
+      'Used for algorithmic problem solving — 200+ problems across LeetCode and GeeksforGeeks, and a 4★ HackerRank rating in Python.',
+  },
+  {
+    id: 'frontend',
+    number: '02',
+    title: 'Frontend',
+    note: 'The interface layer: React, and 3D on the web when a page needs to be a place.',
+    accent: '#4B8CFF',
+    items: ['React', 'JavaScript', 'Three.js'],
+    detail:
+      'React Three Fiber and Three.js for the debate arena, React for the surrounding product, plain JavaScript underneath both.',
+  },
+  {
+    id: 'core',
+    number: '03',
+    title: 'Core concepts',
+    note: 'The layer between: how state, requests and rules move through a system.',
+    accent: '#54E0A0',
+    items: ['Data structures', 'OOP', 'Client–server', 'Real-time state', 'Input validation'],
+    detail:
+      'Server-authoritative rules, rating and ranking logic, and REST APIs behind Express — the parts that have to be correct before the interface can be pleasant.',
+  },
+]

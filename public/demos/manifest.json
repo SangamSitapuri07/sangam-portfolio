@@ -1,0 +1,4 @@
+{
+  "$comment": "Web builds of your own projects, served from this folder and run inside the portfolio's demo environment. Add an entry per project: { \"demos\": { \"nuno\": { \"path\": \"/demos/nuno/index.html\" } } }. See docs/DEMO-LAB.md.",
+  "demos": {}
+}

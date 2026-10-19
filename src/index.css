@@ -1,0 +1,261 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------
+   Self-hosted Inter (variable). Kept in /public/fonts so the type
+   renders identically offline and costs no third-party round-trip.
+------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/* ==================================================================
+   DESIGN TOKENS
+   One accent (electric blue) + one supporting hue (violet) used only
+   for light, never for large fills.
+================================================================== */
+@theme {
+  /* Surfaces — near-black, never pure black */
+  --color-void: #05060a;
+  --color-abyss: #080a11;
+  --color-surface: #0c0f17;
+  --color-surface-2: #12161f;
+  --color-surface-3: #171c27;
+  --color-line: #1e2533;
+  --color-line-soft: #161c27;
+
+  /* Ink */
+  --color-ink: #eef2f9;
+  --color-ink-soft: #9ba5b7;
+  /* The dimmest ink still clears WCAG AA (4.5:1) on every surface it is painted
+     on — including surface-3, the lightest of them. #667082 looked right on a
+     good monitor and measured 3.4:1, which is unreadable in daylight. */
+  --color-ink-faint: #858d9b;
+
+  /* Accent — electric blue */
+  --color-accent: #4b8cff;
+  --color-accent-bright: #7fb0ff;
+  --color-accent-deep: #1b3b73;
+  --color-accent-glow: #2f6fe0;
+
+  /* Supporting hue — violet, for rim light + subtle gradients only */
+  --color-violet: #7c5cff;
+  --color-violet-soft: #a894ff;
+
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, monospace;
+
+  --text-hero: clamp(2.75rem, 9.5vw, 8.5rem);
+  --text-hero--line-height: 0.92;
+  --text-hero--letter-spacing: -0.045em;
+
+  --text-display: clamp(2rem, 5vw, 3.75rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.03em;
+
+  --text-title: clamp(1.35rem, 2.4vw, 1.9rem);
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.02em;
+
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.24em;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ==================================================================
+   BASE
+================================================================== */
+@layer base {
+  html {
+    background-color: var(--color-void);
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11' 1, 'ss01' 1;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  p {
+    text-wrap: pretty;
+    margin: 0;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+    color: #fff;
+  }
+
+  /* Visible, high-contrast keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-bright);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Subtle scrollbar that matches the studio-dark environment */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-surface-3) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 3px solid var(--color-void);
+  }
+
+  canvas {
+    display: block;
+    touch-action: pan-y;
+  }
+}
+
+/* ==================================================================
+   COMPONENT PRIMITIVES
+   Deliberately few: one glass surface, one eyebrow label, one button
+   treatment. Repeated everywhere so the interface reads as a system.
+================================================================== */
+@utility eyebrow {
+  font-size: var(--text-eyebrow);
+  line-height: var(--text-eyebrow--line-height);
+  letter-spacing: var(--text-eyebrow--letter-spacing);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-ink-faint);
+}
+
+/* Restrained glassmorphism — a hairline and a whisper of blur, nothing more */
+@utility glass {
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--color-surface-2) 82%, transparent),
+    color-mix(in oklab, var(--color-surface) 62%, transparent)
+  );
+  border: 1px solid color-mix(in oklab, var(--color-line) 90%, transparent);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 18px 40px -24px rgb(0 0 0 / 0.9);
+}
+
+@utility hairline {
+  border: 1px solid var(--color-line);
+}
+
+@utility accent-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-accent) 35%, transparent),
+    0 8px 30px -12px color-mix(in oklab, var(--color-accent) 55%, transparent);
+}
+
+/* The laptop scene sits behind everything; nothing in the DOM should trap
+   pointer events that belong to the WebGL canvas' mouse-parallax listener. */
+@utility canvas-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@utility overlay-layer {
+  position: relative;
+  z-index: 20;
+}
+
+/* ==================================================================
+   REDUCED MOTION
+   CSS-level: kill decorative transitions. The 3D layer reads the same
+   media query in JS and switches to its static camera path.
+================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ==================================================================
+   KEYFRAMES
+   Only two — decorative motion is deliberately rare.
+================================================================== */
+@keyframes scrollcueline {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(320%);
+    opacity: 0;
+  }
+}
+
+@keyframes pulseSoft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Screen-reader-only helper (used for chapter/section context) */
+@utility sr-only-focusable {
+  &:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

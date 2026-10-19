@@ -1,0 +1,553 @@
+/**
+ * Content + config contract test (development tool, not shipped).
+ *
+ * The site's copy lives in plain data modules and its behaviour in config
+ * modules. A typo in either — `profile.specialtys`, `loader.minDisplayTime` —
+ * produces no build error and no type error; it produces `undefined` at runtime,
+ * which on this site means a blank section or a dead loader.
+ *
+ * Two passes:
+ *   1. Explicit assertions for every value on the critical path, with the
+ *      intended shape checked — including the colour-format constraint, since
+ *      the UI appends hex alpha to accent values (`${accent}2e`).
+ *   2. A static sweep: every `data.<key>` access found in src/**\/*.{js,jsx} is
+ *      cross-checked against the module's real exports, so anything the first
+ *      pass forgot still fails loudly.
+ *
+ *   node tools/verify-content.mjs
+ */
+
+import { readFile, readdir } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
+const srcDir = path.join(root, 'src')
+
+let checks = 0
+const failures = []
+const HEX = /^#[0-9a-f]{6}$/i
+const isHex = (value) => typeof value === 'string' && HEX.test(value)
+
+const at = (object, dotted) =>
+  dotted.split('.').reduce((value, key) => (value == null ? undefined : value[key]), object)
+
+function has(module, dotted, { type, min, expect, label, optional } = {}) {
+  checks += 1
+  const value = at(module, dotted)
+  if (optional && (value === undefined || value === null)) return true
+  let ok = value !== undefined && value !== null
+
+  if (ok && type === 'string') ok = typeof value === 'string' && value.trim().length > 0
+  if (ok && type === 'number') ok = typeof value === 'number' && Number.isFinite(value)
+  if (ok && type === 'color') ok = isHex(value)
+  if (ok && type === 'array') ok = Array.isArray(value) && value.length > 0 && (!min || value.length >= min)
+  if (ok && type === 'object') ok = typeof value === 'object' && !Array.isArray(value)
+  if (ok && type === 'nullable') ok = true
+  if (ok && expect) ok = Boolean(expect(value))
+
+  if (!ok) {
+    const shown = value === undefined ? 'undefined' : JSON.stringify(value)?.slice(0, 64)
+    failures.push(`${(label ?? dotted).padEnd(52)} →  ${shown}`)
+  }
+  return ok
+}
+
+const load = async (relative) => import(pathToFileURL(path.join(srcDir, relative)).href)
+
+/* ------------------------------------------------------------------ data */
+const { profile: person } = await load('data/profile.js')
+const { units } = await load('lib/explodedView.js')
+const { parts, partByUnit } = await load('config/parts.js')
+const { scrim, cssBackground, minAlphaOver } = await load('config/scrim.js')
+const { stages, copyZoneFor } = await load('lib/framing.js')
+const projectsModule = await load('data/projects.js')
+const skillsModule = await load('data/skills.js')
+const timelineModule = await load('data/timeline.js')
+
+const { projects } = projectsModule
+const { skillCategories } = skillsModule
+const { timeline, achievements } = timelineModule
+
+console.log('\n▸ identity')
+for (const key of ['name', 'initials', 'role', 'tagline', 'status', 'location.full']) {
+  has(person, key, { type: 'string' })
+}
+has(person, 'specialties', { type: 'array', min: 3 })
+has(person, 'facts', { type: 'array', min: 3 })
+
+console.log('▸ about / closing / contact / education')
+has(person, 'about.headline', { type: 'string' })
+has(person, 'about.intro', { type: 'string' })
+has(person, 'about.facts', { type: 'array', min: 2 })
+has(person, 'about.footer', { type: 'array', min: 1 })
+has(person, 'closing.title', { type: 'string' })
+has(person, 'closing.subtitle', { type: 'string' })
+has(person, 'closing.primaryCta', { type: 'string' })
+has(person, 'closing.secondaryCta', { type: 'string' })
+has(person, 'contact.email', { type: 'string', expect: (v) => v.includes('@') })
+has(person, 'contact.github', { type: 'string', expect: (v) => v.startsWith('https://') })
+has(person, 'contact.githubHandle', { type: 'string' })
+has(person, 'contact.linkedin', { type: 'string', expect: (v) => v.startsWith('https://') })
+has(person, 'contact.linkedinHandle', { type: 'string' })
+has(person, 'resume.href', { type: 'string', expect: (v) => v.startsWith('/') })
+has(person, 'resume.label', { type: 'string' })
+has(person, 'resume.meta', { type: 'string' })
+has(person, 'education.institution', { type: 'string' })
+has(person, 'education.degree', { type: 'string' })
+has(person, 'education.cgpa', { type: 'string' })
+
+console.log('▸ projects')
+/* The CV lists three projects; the data must not grow beyond what it says. */
+has(projectsModule, 'projects', { type: 'array', min: 3 })
+projects.forEach((project) => {
+  const where = `projects[${project.index}]`
+  for (const key of ['id', 'index', 'name', 'subtitle', 'year', 'tagline', 'summary', 'role']) {
+    has(project, key, { type: 'string', label: `${where}.${key}` })
+  }
+  has(project, 'tech', { type: 'array', min: 2, label: `${where}.tech` })
+  has(project, 'highlights', { type: 'array', min: 2, label: `${where}.highlights` })
+  has(project, 'stats', { type: 'array', label: `${where}.stats` })
+  has(project, 'cover.from', { type: 'color', label: `${where}.cover.from` })
+  has(project, 'cover.via', { type: 'color', label: `${where}.cover.via` })
+  has(project, 'cover.to', { type: 'color', label: `${where}.cover.to` })
+  has(project, 'cover.mark', { type: 'string', label: `${where}.cover.mark` })
+  has(project, 'screen.accent', { type: 'color', label: `${where}.screen.accent` })
+  has(project, 'screen.mode', {
+    type: 'string',
+    label: `${where}.screen.mode`,
+    // 'editor' is the documented alias for the component-tree diagram
+    expect: (v) => ['map', 'terminal', 'arena', 'mobile', 'editor', 'default'].includes(v),
+  })
+  has(project, 'links.github', { type: 'string', expect: (v) => v.startsWith('https://'), label: `${where}.links.github` })
+  has(project, 'links.extra', { type: 'object', optional: true, label: `${where}.links.extra` })
+  has(project, 'links.live', {
+    type: 'string',
+    optional: true,
+    expect: (v) => v.startsWith('https://'),
+    label: `${where}.links.live`,
+  })
+  project.stats.forEach((stat, index) => {
+    has(stat, 'label', { type: 'string', label: `${where}.stats[${index}].label` })
+    has(stat, 'value', { type: 'string', label: `${where}.stats[${index}].value` })
+  })
+})
+
+console.log('▸ skills')
+has(skillsModule, 'skillCategories', { type: 'array', min: 4 })
+skillCategories.forEach((category) => {
+  const where = `skillCategories[${category.id ?? '?'}]`
+  for (const key of ['id', 'title', 'note']) has(category, key, { type: 'string', label: `${where}.${key}` })
+  has(category, 'accent', { type: 'color', label: `${where}.accent` })
+  has(category, 'items', { type: 'array', min: 3, label: `${where}.items` })
+  has(category, 'also', { type: 'array', label: `${where}.also` })
+})
+
+console.log('▸ timeline + achievements')
+has(timelineModule, 'timeline', { type: 'array', min: 8 })
+timeline.forEach((entry, index) => {
+  const where = `timeline[${index}]`
+  for (const key of ['id', 'kind', 'period', 'title', 'organisation', 'detail']) {
+    has(entry, key, { type: 'string', label: `${where}.${key}` })
+  }
+  has(entry, 'tags', { type: 'array', label: `${where}.tags` })
+  has(entry, 'link', { type: 'object', optional: true, label: `${where}.link` })
+})
+has(timelineModule, 'achievements', { type: 'array', min: 2 })
+achievements.forEach((item, index) => {
+  has(item, 'value', { type: 'string', label: `achievements[${index}].value` })
+  has(item, 'label', { type: 'string', label: `achievements[${index}].label` })
+  has(item, 'detail', { type: 'string', label: `achievements[${index}].detail` })
+})
+has(timelineModule, 'education', { type: 'object' })
+
+/* ---------------------------------------------------------- config values */
+const demos = await load('config/demos.js')
+const animation = await load('config/animation.js')
+const quality = await load('config/quality.js')
+const laptop = await load('config/laptop.js')
+const scenes = await load('config/scenes.js')
+const chaptersModule = await load('data/chapters.js')
+
+console.log('▸ animation + quality config')
+for (const key of ['minDisplayMs', 'maxRatePerSecond', 'settleMs', 'fadeMs']) {
+  has(animation, `loader.${key}`, { type: 'number', expect: (v) => v > 0 })
+}
+for (const key of ['damping', 'scrub', 'overlay', 'easing', 'scroll', 'reducedMotion']) {
+  has(animation, key, { type: 'object' })
+}
+has(animation, 'reducedMotion.cameraTravelScale', { type: 'number' })
+has(quality, 'autoTune', { type: 'object' })
+has(quality, 'autoTune.sampleFrames', { type: 'number', expect: (v) => v > 10 })
+has(quality, 'autoTune.slowFrameMs', { type: 'number', expect: (v) => v > 16 })
+has(quality, 'dprCeiling.mobile', { type: 'number', expect: (v) => v <= 1.5 })
+has(quality, 'dprCeiling.desktop', { type: 'number', expect: (v) => v <= 2 })
+for (const tier of ['high', 'medium', 'low']) has(quality, `tiers.${tier}`, { type: 'object' })
+
+console.log('▸ demo environment')
+
+/* Every project the CV gives a Live Demo must have somewhere to run it, and the
+   demo must point at that same CV link — not at something invented for the
+   portfolio. A project with no demo entry is a silent dead end in the UI. */
+projects.forEach((project) => {
+  has(demos, `demos.${project.id}`, { type: 'object', label: `demos.${project.id}` })
+  has(demos.demos[project.id] ?? {}, 'src', { type: 'string', label: `demos.${project.id}.src` })
+  has(demos.demos[project.id] ?? {}, 'frame', {
+    type: 'string',
+    expect: (v) => ['phone', 'browser'].includes(v),
+    label: `demos.${project.id}.frame`,
+  })
+  has(demos.demos[project.id] ?? {}, 'badge', { type: 'string', label: `demos.${project.id}.badge` })
+})
+
+let demoMismatch = []
+let demoRunnable = 0
+for (const project of projects) {
+  const demo = demos.demos[project.id]
+  if (!demo) continue
+  checks += 1
+  /* The frame is decided by whether the thing is held in a hand. */
+  const expectsPhone = ['mobile', 'terminal'].includes(project.screen?.mode) && project.id !== 'nuno'
+  if (expectsPhone && demo.frame !== 'phone') demoMismatch.push(`${project.id}: frame ${demo.frame}`)
+  if (demo.runnable) demoRunnable += 1
+  /* An entry that claims the real app is running must not be a recording. */
+  if (demo.kind === 'web' && demo.badge.toLowerCase().includes('recorded')) {
+    demoMismatch.push(`${project.id}: a web demo labelled as a recording`)
+  }
+  /* Anything that cannot run in a browser must say why, in words. */
+  if (!demo.runnable && demo.runtime === 'android' && !demo.limitation) {
+    demoMismatch.push(`${project.id}: native Android with no stated limitation`)
+  }
+}
+checks += 1
+if (demoMismatch.length) failures.push(`demo environment: ${demoMismatch.join(', ')}`)
+
+/* At least one project must genuinely run here, or "run my projects" is a claim
+   with nothing behind it. */
+checks += 1
+if (demoRunnable === 0) failures.push('demo environment: no project can actually run')
+
+console.log('▸ laptop rig config')
+for (const key of ['y', 'z', 'closedAngle', 'openAngle', 'liftSettle']) {
+  has(laptop, `hinge.${key}`, { type: 'number' })
+}
+has(laptop, 'screens.main.node', { type: 'string', expect: (v) => v.startsWith('Object_') })
+has(laptop, 'screens.status.node', { type: 'string', expect: (v) => v.startsWith('Object_') })
+has(laptop, 'parts.base', { type: 'array', min: 1 })
+has(laptop, 'parts.lid', { type: 'array', min: 1 })
+has(laptop, 'parallax', { type: 'object' })
+
+console.log('▸ scene storyboard')
+has(scenes, 'scenes', { type: 'array', min: 10 })
+has(scenes, 'navSections', { type: 'array', min: 5 })
+has(scenes, 'overlayTiming', { type: 'object' })
+for (const key of ['enterFraction', 'holdFraction', 'exitFraction']) {
+  has(scenes, `overlayTiming.${key}`, { type: 'number' })
+}
+
+/* The ten scenes, in order. The order is the film; a reordering is a creative
+   decision, so it is written down here as well as in the config. */
+const SCENE_ORDER = [
+  'awakening',
+  'engine',
+  'breakdown',
+  'core',
+  'universe',
+  'deep-dive',
+  'rebuild',
+  'beyond',
+  'transmission',
+  'afterglow',
+]
+checks += 1
+if (scenes.scenes.map((scene) => scene.id).join(',') !== SCENE_ORDER.join(',')) {
+  failures.push(`scenes are not in the authored order: ${scenes.scenes.map((scene) => scene.id).join(', ')}`)
+}
+
+/* ------------------------------------------------------------------ shield
+ * The copy floats over the machine now, so the shield is load-bearing. Two ways it
+ * can fail silently: the numbers can stop covering the copy rectangle, and the CSS
+ * can be emitted in an order the browser clamps. Both are checked here.
+ */
+console.log('\n▸ the copy shield')
+for (const variant of ['desktop', 'mobile']) {
+  const zone = copyZoneFor('full', variant)
+  const min = minAlphaOver(zone, variant)
+  checks += 1
+  if (min < scrim.minAlpha) {
+    failures.push(`scrim.${variant}: only ${min.toFixed(3)} under the copy, needs ${scrim.minAlpha}`)
+  }
+  console.log(`  · ${variant.padEnd(8)} ${(min * 100).toFixed(0)}% minimum under the copy`)
+
+  /* Parse the two emitted gradients and assert the stop positions ascend, which is
+     the only thing standing between the wash and a hard band. */
+  const gradients = cssBackground(variant).split(/(?=linear-gradient)/).filter(Boolean)
+  checks += 1
+  if (gradients.length !== 2) failures.push(`scrim.${variant}: expected two gradients, got ${gradients.length}`)
+  for (const gradient of gradients) {
+    const positions = [...gradient.matchAll(/([\d.]+)%/g)].map((match) => parseFloat(match[1]))
+    checks += 1
+    if (positions.some((value, index) => index > 0 && value < positions[index - 1])) {
+      failures.push(`scrim.${variant}: a gradient stop moves backwards (${positions.join(', ')})`)
+    }
+  }
+}
+
+/* Every stage the storyboard uses has a copy rectangle, or the caption has nowhere
+   to sit and the composition check has nothing to measure. */
+for (const scene of scenes.scenes) {
+  for (const key of scene.keys) {
+    checks += 1
+    if (!stages[key.camera.stage]?.copy?.['desktop']) {
+      failures.push(`scenes[${scene.id}] uses stage '${key.camera.stage}' with no copy rectangle`)
+    }
+  }
+}
+
+/* Every chapter must exist for every scene, and every scene for every chapter:
+   copy and camera work are separate files, so this is the seam that can drift. */
+checks += 1
+if (scenes.scenes.length !== chaptersModule.chapters.length) {
+  failures.push(`scene count (${scenes.scenes.length}) does not match chapter count (${chaptersModule.chapters.length})`)
+}
+for (const scene of scenes.scenes) {
+  checks += 1
+  if (!chaptersModule.chapterById[scene.id]) failures.push(`scene '${scene.id}' has no matching chapter`)
+}
+
+scenes.scenes.forEach((scene) => {
+  const where = `scenes[${scene.id ?? '?'}]`
+  for (const key of ['id', 'chapter', 'anchorId']) {
+    has(scene, key, { type: 'string', label: `${where}.${key}` })
+  }
+  has(scene, 'height', { type: 'number', label: `${where}.height`, expect: (v) => v >= 60 && v <= 400 })
+  has(scene, 'nav', { type: 'object', optional: true, label: `${where}.nav` })
+  has(scene, 'screen.section', { type: 'string', label: `${where}.screen.section` })
+
+  /* Camera keys: intent, never coordinates. Every one must be frameable. */
+  has(scene, 'keys', { type: 'array', min: 1, label: `${where}.keys` })
+  /* Keys inherit whatever the previous key set, so only the first key of a scene
+     has to name everything; the inherited values still have to be in range. */
+  let lid = 1
+  let explode = 0
+  scene.keys?.forEach((key, index) => {
+    const at = `${where}.keys[${index}]`
+    has(key, 'at', { type: 'number', label: `${at}.at`, expect: (v) => v >= 0 && v <= 1 })
+    if (key.lid != null) lid = key.lid
+    if (key.explode != null) explode = key.explode
+    checks += 1
+    if (!(lid >= 0 && lid <= 1)) failures.push(`${at}.lid resolves to ${lid}`)
+    checks += 1
+    if (!(explode >= 0 && explode <= 1)) failures.push(`${at}.explode resolves to ${explode}`)
+    has(key, 'camera', { type: 'object', label: `${at}.camera` })
+    /* `dolly` is a distance in subject-radii — the lens is solved from it, so a
+       non-positive value would divide by zero in framing.js. */
+    for (const field of ['azimuth', 'elevation', 'fill', 'dolly']) {
+      has(key.camera, field, {
+        type: 'number',
+        label: `${at}.camera.${field}`,
+        ...(field === 'dolly' ? { expect: (v) => v > 0.2 && v < 12 } : {}),
+      })
+    }
+    /* `full` is the film's default: the machine is the background. `split` and
+       `banner` survive for any shot that genuinely needs clear space beside it. */
+    has(key.camera, 'stage', {
+      type: 'string',
+      label: `${at}.camera.stage`,
+      expect: (v) => v === 'full' || v === 'split' || v === 'banner',
+    })
+    has(key.camera, 'fit', {
+      type: 'string',
+      optional: true,
+      label: `${at}.camera.fit`,
+      expect: (v) => v === 'all' || v === 'core',
+    })
+    has(key.cameraMobile, 'stage', {
+      type: 'string',
+      optional: true,
+      label: `${at}.cameraMobile.stage`,
+    })
+  })
+  /* A `focus` key names a component the model actually has, and that component
+     must carry copy in `config/parts.js`; otherwise the shot aims at nothing and
+     the caption has nothing to say. */
+  for (const [index, key] of (scene.keys || []).entries()) {
+    if (!key.camera?.focus) continue
+    const label = `${where}.keys[${index}].camera.focus`
+    checks += 1
+    if (!units.some((unit) => unit.id === key.camera.focus)) {
+      failures.push(`${label} →  '${key.camera.focus}' is not a unit of the model`)
+    }
+    checks += 1
+    if (!partByUnit[key.camera.focus]) failures.push(`${label} →  no copy for '${key.camera.focus}'`)
+  }
+
+  /* Story beats: in order, non-overlapping, inside the scene, naming a real part. */
+  if (scene.story) {
+    checks += 1
+    if (!Array.isArray(scene.story) || scene.story.length === 0) {
+      failures.push(`${where}.story is present but empty`)
+    }
+    let previousTo = 0
+    for (const [index, beat] of (scene.story || []).entries()) {
+      const label = `${where}.story[${index}]`
+      checks += 1
+      if (!partByUnit[beat.part]) failures.push(`${label}.part →  no such part '${beat.part}'`)
+      checks += 1
+      if (!(beat.from >= previousTo && beat.to > beat.from && beat.to <= 1)) {
+        failures.push(`${label} spans ${beat.from}…${beat.to}, out of order or outside the scene`)
+      }
+      previousTo = beat.to ?? previousTo
+    }
+  }
+
+  /* The first key is the scene's establishing shot: it must open on the frame. */
+  checks += 1
+  if (scene.keys?.[0]?.at !== 0) failures.push(`${where} does not start its key list at 0`)
+  /* The establishing key decides where the copy goes; the DOM reads it too. */
+  has(scene.keys?.[0], 'camera.stage', { type: 'string', label: `${where}.establishing stage` })
+  /* Scene 03 and 07 are the same animation run in opposite directions: both must
+     reach a fully exploded machine, or the reassembly has nothing to reverse. */
+  if (scene.id === 'breakdown' || scene.id === 'rebuild') {
+    checks += 1
+    const reachesFull = scene.keys.some((key) => key.explode === 1)
+    if (!reachesFull) failures.push(`${where} never reaches a full exploded view`)
+  }
+  if (scene.id === 'breakdown' || scene.id === 'rebuild') {
+    checks += 1
+    const endsExploded = scene.id === 'breakdown'
+    const last = [...scene.keys].reverse().find((key) => key.explode != null)
+    if (endsExploded && last?.explode !== 1) failures.push('breakdown does not end fully exploded')
+    if (!endsExploded && scene.keys[0].explode !== 1) failures.push('rebuild does not start fully exploded')
+  }
+})
+scenes.navSections.forEach((section, index) => {
+  has(section, 'label', { type: 'string', label: `navSections[${index}].label` })
+  has(section, 'id', { type: 'string', label: `navSections[${index}].id` })
+})
+
+/* ---------------------------------------------- static sweep for typos */
+const SWEEP_NAMES = ['profile', 'projects', 'skillCategories', 'timeline']
+const exportedKeys = {
+  profile: Object.keys(person),
+  projects: Object.keys(projectsModule),
+  skillCategories: Object.keys(skillsModule),
+  timeline: Object.keys(timelineModule),
+}
+const ARRAY_METHODS = new Set([
+  'find', 'filter', 'map', 'forEach', 'slice', 'splice', 'flatMap', 'reduce', 'reduceRight',
+  'some', 'every', 'sort', 'reverse', 'join', 'includes', 'indexOf', 'lastIndexOf', 'at',
+  'concat', 'push', 'pop', 'shift', 'unshift', 'fill', 'findIndex', 'findLast', 'entries',
+  'keys', 'values', 'length', 'toString', 'toLocaleString', 'flat',
+])
+
+const walk = async (dir) => {
+  const entries = await readdir(dir, { withFileTypes: true })
+  const files = []
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) files.push(...(await walk(full)))
+    else if (/\.(js|jsx)$/.test(entry.name)) files.push(full)
+  }
+  return files
+}
+
+/* ------------------------------------------------------------- copy hygiene
+ * The prose is the product; a stray double space or a full stop with no space
+ * after it is exactly the kind of thing nobody notices again once it ships. Walk
+ * every string in the data modules and hold them all to the same rules.
+ */
+const COPY_RULES = [
+  [/ {2,}/, 'double space'],
+  [/ [,.;:!?]/, 'space before punctuation'],
+  [/\b([A-Za-z]{3,})\s+\1\b/i, 'repeated word'],
+  [/[a-z]\.[A-Z]/, 'no space after a full stop'],
+  [/(\d)(kg|km|GB|MB|ms)\b/, 'no space before a unit'],
+  [/,\s*,|\.[\s.]*\./, 'doubled punctuation'],
+  [/\s$/, 'trailing space'],
+  [/^\s/, 'leading space'],
+  [/\s[—–-]$/, 'dangling dash'],
+]
+
+const copyStrings = []
+const collectStrings = (value, path) => {
+  if (typeof value === 'string') copyStrings.push({ path, value })
+  else if (Array.isArray(value)) value.forEach((entry, i) => collectStrings(entry, `${path}[${i}]`))
+  else if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) collectStrings(entry, `${path}.${key}`)
+  }
+}
+for (const [name, module] of Object.entries({
+  profile: person,
+  projects,
+  skillCategories,
+  timeline,
+  achievements,
+})) {
+  collectStrings(module, name)
+}
+
+for (const { path, value } of copyStrings) {
+  for (const [pattern, label] of COPY_RULES) {
+    if (pattern.test(value)) failures.push(`${path}: ${label} — ${JSON.stringify(value.slice(0, 80))}`)
+  }
+}
+checks += COPY_RULES.length
+console.log(`\n▸ copy hygiene · ${copyStrings.length} strings against ${COPY_RULES.length} rules`)
+
+let swept = 0
+for (const file of await walk(srcDir)) {
+  const code = await readFile(file, 'utf8')
+  const relative = path.relative(root, file)
+  const pattern = new RegExp(`\\b(${SWEEP_NAMES.join('|')})\\.([A-Za-z_$][\\w$]*)`, 'g')
+  for (const match of code.matchAll(pattern)) {
+    const [, moduleName, key] = match
+    if (ARRAY_METHODS.has(key)) continue
+    const known = exportedKeys[moduleName]
+    if (!known) continue
+    swept += 1
+    if (!known.includes(key)) {
+      failures.push(`${relative}: ${moduleName}.${key} — not exported by the data module`)
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ report
+ * `checks` counts the explicit assertions, `swept` the data reads, and the one
+ * check below makes the README's quoted total the last thing to be verified: a
+ * count nobody re-reads goes stale, so the suite reads its own documentation.
+ */
+const total = checks + swept + 1
+
+/* Every document that quotes this suite's size is checked, so none of them can
+   quietly go stale — the README did, which is why this guard exists. */
+const QUOTING_DOCS = [
+  ['README.md', /`verify:content`\s*\|\s*(\d[\d,]*)\s+assertions/],
+  /* Flexible whitespace: markdown wraps, and the first version of this pattern
+     missed a phrase split across a line break — the guard has to be as forgiving
+     as the prose it reads. */
+  ['docs/QA-CHECKLIST.md', /(\d[\d,]*)\s+content\s+assertions/i],
+]
+for (const [doc, pattern] of QUOTING_DOCS) {
+  const quote = await readFile(path.join(root, doc), 'utf8')
+    .then((text) => text.match(pattern))
+    .catch(() => null)
+  if (!quote) {
+    failures.push(`${doc} no longer quotes how many assertions this suite makes`)
+  } else if (Number(quote[1].replace(/,/g, '')) !== total) {
+    failures.push(`${doc} says ${quote[1]} assertions; this suite makes ${total}`)
+  }
+}
+checks = total
+
+console.log(
+  `\n▸ ${checks} assertions · ${swept} data reads cross-checked · ` +
+    `${failures.length ? `${failures.length} FAILED` : 'all good'}`
+)
+if (failures.length) {
+  console.log('\n✗ failures')
+  for (const failure of [...new Set(failures)]) console.log(`  · ${failure}`)
+  process.exitCode = 1
+} else {
+  console.log('✓ content contract holds\n')
+}
