@@ -1,61 +1,43 @@
-// Personal Information
-// All your personal details in ONE place
-// Update these anytime - reflects everywhere in portfolio
+import { RESUME_ASSET } from '../config/assets.js'
 
+const EDUCATION = {
+  institution: 'Lovely Professional University',
+  location: 'Phagwara, Punjab',
+  degree: 'B.Tech · Computer Science and Engineering',
+  period: 'Aug 2024 – Present',
+  cgpa: '8.52',
+}
+
+// Profile and education come from the supplied SangamCV.pdf.
+// Keep unconfirmed details out rather than publishing sample contact links.
 export const PERSONAL = {
-  // Basic Info
-  name: 'Sangam Yadav',
+  name: 'Sangam Sitapuri',
   firstName: 'Sangam',
-  lastName: 'Yadav',
-  
-  // Title / Role
+  lastName: 'Sitapuri',
+  initials: 'SS',
   title: 'Full Stack & Android Developer',
-  shortTitle: 'Developer',
-  
-  // Tagline (appears in hero)
-  tagline: 'I build ideas into reality.',
-  
-  // Why you code (appears in about/origin)
-  motto: 'Because I love creating something.',
-  
-  // Location
-  location: {
-    city: 'Jaunpur',
-    state: 'UP',
-    country: 'India',
-    full: 'Jaunpur, UP, India',
-    coordinates: {
-      lat: 25.7546,
-      lng: 82.6837,
-    },
+  shortTitle: 'Developer & Builder',
+  tagline: 'Ideas, engineered into reality.',
+  introduction: 'I build thoughtful digital experiences—from full-stack applications to Android apps and real-time systems.',
+  education: EDUCATION,
+  about: {
+    heading: 'Curiosity is the starting point.',
+    summary: `I’m a Computer Science and Engineering student at ${EDUCATION.institution}. I build full-stack applications, Android experiences, and real-time systems—with a focus on thoughtful interfaces and reliable backend engineering.`,
+    points: [
+      'B.Tech · Computer Science & Engineering',
+      `${EDUCATION.institution} · ${EDUCATION.period}`,
+      `CGPA ${EDUCATION.cgpa}`,
+      'Full-stack, Android & real-time development',
+    ],
   },
-  
-  // Bio (for origin section - update later)
-  bio: {
-    short: 'A developer passionate about building things that matter.',
-    medium: 'Full stack and Android developer based in Jaunpur, India. I build apps, games, and AI experiences.',
-    long: 'I am Sangam Yadav, a developer who loves turning ideas into reality. From Android apps to web games to AI tools, I build because I love creating something.',
-  },
-  
-  // Contact (UPDATE THESE LATER)
   contact: {
-    email: 'your-email@example.com',
+    email: 'sitapurisangampac@gmail.com',
     github: 'https://github.com/SangamSitapuri07',
     githubUsername: 'SangamSitapuri07',
-    linkedin: 'https://linkedin.com/in/your-username',
-    twitter: '',
-    instagram: '',
-    portfolio: 'https://sangam-portfolio-roan.vercel.app',
+    linkedin: 'https://www.linkedin.com/in/sangam-sitapuri',
   },
-  
-  // Final message (contact section)
-  farewell: "Let's build something unforgettable.",
-  
-  // SEO
-  seo: {
-    title: 'Sangam Yadav - Full Stack & Android Developer',
-    description: 'Inside the Mind of a Builder - Interactive 3D Portfolio of Sangam Yadav, a Full Stack & Android Developer from India.',
-    keywords: 'Sangam Yadav, Full Stack Developer, Android Developer, Portfolio, React, Three.js, India',
-    ogImage: '/images/og-image.jpg',
-  },
+  resume: RESUME_ASSET.url,
+  resumeFilename: RESUME_ASSET.downloadName,
+  farewell: 'Let’s build something meaningful.',
+  portfolioYear: '2026',
 }

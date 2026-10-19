@@ -1,161 +1,81 @@
-// Timeline Data
-// Your journey as a developer
-// Update real dates and stories anytime
-
+// Dates and credentials transcribed from SangamCV.pdf, not inferred from repos.
+// Displayed in the experience/certification scene. No invented internships.
 export const TIMELINE = [
   {
-    id: 'first-code',
-    order: 1,
-    year: '2021',
-    month: 'Jan',
-    title: 'The First Line',
-    subtitle: 'Where it all began',
-    description: 'Wrote my first "Hello World". Did not know it would change everything.',
-    emotion: 'excited',
-    color: '#4a90d9',
-    icon: '💻',
-    sceneType: 'terminal',
-    isFuture: false,
+    id: 'oracle-ai-foundations',
+    kind: 'certification',
+    date: 'Jul 2026',
+    sortDate: '2026-07',
+    title: 'OCI AI Foundations Associate',
+    fullTitle: 'Oracle Cloud Infrastructure Certified AI Foundations Associate',
+    organisation: 'Oracle',
+    description: 'Certification in AI foundations on Oracle Cloud Infrastructure.',
+    credentialUrl: 'https://drive.google.com/file/d/1Api7HzIjC66HgIjEIPryygnF6R2xGKsc/view?usp=sharing',
   },
-
   {
-    id: 'android-journey',
-    order: 2,
-    year: '2022',
-    month: 'Mar',
-    title: 'Discovered Android',
-    subtitle: 'Mobile became my canvas',
-    description: 'Started learning Android development. Fell in love with building things people carry in their pockets.',
-    emotion: 'curious',
-    color: '#3ddc84',
-    icon: '📱',
-    sceneType: 'phone',
-    isFuture: false,
+    id: 'data-structures-training',
+    kind: 'training',
+    date: 'Jun – Jul 2026',
+    sortDate: '2026-07',
+    title: 'Data Structures Fundamentals',
+    fullTitle: 'Data Structures Fundamentals: Basic to Applications',
+    organisation: 'Lovely Professional University',
+    description: 'Practical C++ training in arrays, strings, linked lists, stacks, queues, and DSA problem solving.',
+    credentialUrl: 'https://drive.google.com/file/d/1Gntkt3WCIkR_aLoANMZM5xZvTI1C8AMq/view?usp=sharing',
   },
-
   {
-    id: 'news-pinch',
-    order: 3,
-    year: '2023',
-    month: 'Jun',
-    title: 'News Pinch Launched',
-    subtitle: 'My first complete app',
-    description: 'Built and launched News Pinch. Real users. Real feedback. Real growth.',
-    emotion: 'proud',
-    color: '#1a73e8',
-    icon: '📰',
-    sceneType: 'news-phone',
-    isFuture: false,
+    id: 'programming-java',
+    kind: 'certification',
+    date: 'May 2026',
+    sortDate: '2026-05',
+    title: 'Programming in Java',
+    organisation: 'IamNeo',
+    description: 'Java programming certification.',
+    credentialUrl: 'https://drive.google.com/file/d/1UfXMKCK-VWaSTLHodLqJ7u5f6DylZD95/view?usp=sharing',
   },
-
   {
-    id: 'dot-connect',
-    order: 4,
-    year: '2023',
-    month: 'Sep',
-    title: 'Dot and Connect',
-    subtitle: 'Entered the multiplayer world',
-    description: 'Built a real-time multiplayer game with AI opponent. Learned that real-time sync is a different beast.',
-    emotion: 'determined',
-    color: '#34a853',
-    icon: '🎮',
-    sceneType: 'game',
-    isFuture: false,
+    id: 'programming-cpp',
+    kind: 'certification',
+    date: 'Aug 2025',
+    sortDate: '2025-08',
+    title: 'Programming Using C++',
+    organisation: 'Infosys',
+    description: 'C++ programming certification.',
+    credentialUrl: 'https://drive.google.com/file/d/13gbliskdUzSE5P59cv7px_jz4kz2rytF/view?usp=drive_link',
   },
-
   {
-    id: 'ai-debate',
-    order: 5,
-    year: '2024',
-    month: 'Feb',
-    title: 'AI Debate Coach',
-    subtitle: 'First taste of AI magic',
-    description: 'Combined AI with 3D animations. Fell completely in love with what AI can do.',
-    emotion: 'amazed',
-    color: '#8b5cf6',
-    icon: '🤖',
-    sceneType: 'ai',
-    isFuture: false,
+    id: 'software-testing',
+    kind: 'certification',
+    date: 'Nov 2024',
+    sortDate: '2024-11',
+    title: 'Fundamentals of Software Testing',
+    organisation: 'SkillEra',
+    description: 'Foundational software testing certification.',
+    credentialUrl: 'https://drive.google.com/file/d/1WneEobDKscKyBHIatmHysFp91lH20xVq/view?usp=sharing',
   },
-
   {
-    id: 'cafe-billing',
-    order: 6,
-    year: '2024',
-    month: 'Jul',
-    title: 'Café Billing System',
-    subtitle: 'Built for the real world',
-    description: 'First app used in actual business. Proved I can build things that matter to people.',
-    emotion: 'confident',
-    color: '#f59e0b',
-    icon: '☕',
-    sceneType: 'cafe',
-    isFuture: false,
-  },
-
-  {
-    id: 'polity-notes',
-    order: 7,
-    year: '2024',
-    month: 'Nov',
-    title: 'Polity Notes + Quiz',
-    subtitle: 'Built to help others learn',
-    description: 'Created an educational app to help students master polity. Realized building for impact matters most.',
-    emotion: 'fulfilled',
-    color: '#dc2626',
-    icon: '📚',
-    sceneType: 'book',
-    isFuture: false,
-  },
-
-  {
-    id: 'portfolio',
-    order: 8,
-    year: '2025',
-    month: 'Now',
-    title: 'This Portfolio',
-    subtitle: 'You are inside my world',
-    description: 'Built this immersive 3D portfolio to show not just what I build, but how I think.',
-    emotion: 'creative',
-    color: '#00d4ff',
-    icon: '🌌',
-    sceneType: 'portfolio',
-    isFuture: false,
-  },
-
-  {
-    id: 'future',
-    order: 9,
-    year: '2025+',
-    month: 'Soon',
-    title: 'The Next Chapter',
-    subtitle: 'Coming soon...',
-    description: 'The best project is always the next one. Let us build something together.',
-    emotion: 'visionary',
-    color: '#ffd700',
-    icon: '🚀',
-    sceneType: 'future',
-    isFuture: true,
+    id: 'effective-communication',
+    kind: 'certification',
+    date: 'Oct 2024',
+    sortDate: '2024-10',
+    title: 'Effective Communication Skills',
+    organisation: 'SkillEra',
+    description: 'Communication skills certification.',
+    credentialUrl: 'https://drive.google.com/file/d/1sFPnbKuyzelVsiEELl_yUEEn_neGHhOD/view',
   },
 ]
 
-// Helper: Get milestone by ID
-export const getMilestoneById = (id) => {
-  return TIMELINE.find(m => m.id === id)
-}
-
-// Helper: Get milestones by year
-export const getMilestonesByYear = (year) => {
-  return TIMELINE.filter(m => m.year === year)
-}
-
-// Helper: Get all years
-export const getAllYears = () => {
-  return [...new Set(TIMELINE.map(m => m.year))]
-}
-
-// Helper: Get current milestone based on scroll progress
-export const getMilestoneByProgress = (progress, totalProgress = 1) => {
-  const index = Math.floor((progress / totalProgress) * TIMELINE.length)
-  return TIMELINE[Math.min(index, TIMELINE.length - 1)]
-}
+export const ACHIEVEMENTS = [
+  {
+    id: 'coding-problems',
+    title: '200+ coding problems solved',
+    description: 'Across LeetCode and GeeksforGeeks.',
+    date: 'Aug 2024 – Present',
+  },
+  {
+    id: 'python-badge',
+    title: '4-Star Python Programming Badge',
+    description: 'Awarded on HackerRank for coding performance.',
+    date: 'Aug 2024 – Present',
+  },
+]

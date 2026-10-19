@@ -27,4 +27,9 @@ yarn-error.log*
 
 # logs
 logs
-*.loggit add .
+*.log
+
+# local tools and browser-test artifacts
+.arena/
+test-results/
+playwright-report/

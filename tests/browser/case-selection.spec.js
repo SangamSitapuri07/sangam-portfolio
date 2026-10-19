@@ -1,0 +1,52 @@
+import { test, expect } from '@playwright/test'
+
+const caseSection = (page) => page.locator('#deep-dive')
+
+test('case-study selection updates its own content, architecture, and links', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/#deep-dive')
+  const picker = page.getByRole('combobox', { name: 'Choose a project to examine' })
+  await picker.selectOption('nuno')
+  await expect(page).toHaveURL(/feature=nuno/)
+  await expect(caseSection(page).locator('.case-study-copy h3')).toHaveText('Nuno')
+  await expect(caseSection(page).getByRole('tabpanel')).toContainText('server must not trust')
+  await expect(caseSection(page).getByLabel('Nuno architecture')).toContainText('PostgreSQL')
+  await expect(caseSection(page).getByRole('link', { name: 'Android app · Drive', exact: true })).toHaveAttribute('href', /18CvfcClqI6hI97C6cGeu4zrXlPbNsG-s/)
+  await caseSection(page).getByRole('button', { name: 'Full case study', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Nuno', exact: true })
+  await expect(dialog).toContainText('server-side validation')
+  await expect(dialog).not.toContainText('Gemini')
+  await page.keyboard.press('Escape')
+  await picker.selectOption('news-pinch')
+  await expect(caseSection(page).locator('.case-study-copy h3')).toHaveText('News Pinch')
+  await expect(caseSection(page).getByLabel('News Pinch architecture')).toContainText('Kotlin')
+})
+
+test('selected case study survives reload and a card can feature a project', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?feature=news-pinch#deep-dive')
+  await expect(page.getByRole('combobox', { name: 'Choose a project to examine' })).toHaveValue('news-pinch')
+  await page.reload()
+  await expect(caseSection(page).locator('.case-study-copy h3')).toHaveText('News Pinch')
+  await page.goto('/#projects')
+  await page.getByRole('link', { name: 'Explore Nuno case study', exact: true }).click()
+  await expect(page).toHaveURL(/feature=nuno#deep-dive$/)
+  await expect(page.getByRole('combobox', { name: 'Choose a project to examine' })).toHaveValue('nuno')
+  await expect(caseSection(page)).toBeInViewport()
+})
+
+test('the original laptop screen displays the selected project preview', async ({ page }, testInfo) => {
+  testInfo.setTimeout(120000)
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/#deep-dive')
+  await expect(page.locator('[data-scene-ready="true"]')).toBeAttached({ timeout: 60000 })
+  const canvas = page.locator('canvas')
+  await expect(canvas).toHaveAttribute('data-screen-project', 'ai-debate-coach', { timeout: 30000 })
+  await expect(canvas).toHaveAttribute('data-screen-preview', 'ready', { timeout: 30000 })
+  await page.getByRole('combobox', { name: 'Choose a project to examine' }).selectOption('nuno')
+  await expect(canvas).toHaveAttribute('data-screen-project', 'nuno', { timeout: 30000 })
+  await expect(canvas).toHaveAttribute('data-screen-preview', 'ready', { timeout: 30000 })
+  await expect(page.locator('canvas')).toHaveCount(1)
+  expect(errors).toEqual([])
+})
