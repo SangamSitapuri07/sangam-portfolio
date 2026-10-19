@@ -198,12 +198,16 @@ try {
 
   const keys = [
     'boot',
-    'hero',
-    'about',
-    'skills',
+    'awakening',
+    'engine',
+    'breakdown',
+    'core',
     ...projects.map((_, index) => `projects:${index}`),
-    'experience',
-    'contact',
+    'deep-dive',
+    'rebuild',
+    'beyond',
+    'transmission',
+    'afterglow',
   ]
 
   for (const tierName of ['high', 'medium', 'low']) {
@@ -292,20 +296,21 @@ try {
 
   console.log('\n▸ the copy each screen carries')
   const screenText = (key) => reports.find((report) => report.key === key)?.text.join(' ') ?? ''
-  check('hero names the person', screenText('hero').includes(profile.name), `"${profile.name}"`)
-  check('hero states the role', screenText('hero').includes(profile.role))
-  check('about mentions the university', screenText('about').includes(profile.education.institution))
+  check('the hero panel names the person', screenText('engine').includes(profile.name), `"${profile.name}"`)
+  check('the hero panel states the role', screenText('engine').includes(profile.role))
+  check('about mentions the university', screenText('beyond').includes(profile.education.institution))
   check(
     'skills lists every group',
-    skillCategories.every((category) => screenText('skills').includes(category.title))
+    skillCategories.every((category) => screenText('core').includes(category.title))
   )
   projects.forEach((project, index) => {
     const text = screenText(`projects:${index}`)
     check(`project screen ${project.index} is “${project.name}”`, text.includes(project.name))
     check(`project screen ${project.index} carries a stat`, text.length > 60)
   })
-  check('experience lists entries', screenText('experience').length > 200)
-  check('contact shows the email', screenText('contact').includes(profile.contact.email))
+  check('the deep dive names the flagship project', screenText('deep-dive').includes(projects[0].name))
+  check('the reassembly panel describes the parts', screenText('rebuild').length > 80)
+  check('contact shows the email', screenText('transmission').includes(profile.contact.email))
 
   console.log('\n▸ animated pass')
   painted.length = 0

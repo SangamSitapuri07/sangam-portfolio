@@ -41,6 +41,8 @@ export const sceneState = {
   maxScroll: 1,
   activeScene: 0,
   running: false,
+  /** Asset loading progress, 0 → 1. Written by the model loader. */
+  loaderProgress: 1,
 }
 
 const listeners = {

@@ -49,6 +49,17 @@ export const projects = [
       live: 'https://drive.google.com/file/d/18CvfcClqI6hI97C6cGeu4zrXlPbNsG-s/view?usp=sharing',
     },
     screen: { mode: 'terminal', accent: '#54E0A0' },
+    /**
+     * Deep-dive "constraints". Written as the engineering problems the CV's own
+     * bullets imply — no numbers, no invented outcomes.
+     */
+    constraints: [
+      'The client cannot be trusted: every move has to be re-checked on the server before it changes the table.',
+      'Turn order, card legality and deck integrity all have to agree at the same moment, across eight connections.',
+      'Optional house rules multiply the rule surface, so the rules engine has to be data-driven rather than a pile of conditionals.',
+    ],
+    outcome:
+      'A playable server with matchmaking, private rooms and rankings, demonstrated in the linked walkthrough video. There are no public load numbers for it, so none are claimed here.',
     cover: { from: '#0A1F1A', via: '#0E3B2E', to: '#05060A', mark: 'NUNO' },
   },
 
@@ -81,6 +92,13 @@ export const projects = [
       live: 'https://debate-coach.netlify.app/',
     },
     screen: { mode: 'arena', accent: '#FF8A3D' },
+    constraints: [
+      'Two different AI providers had to behave like one backend, with the same request shape and the same failure handling.',
+      'The 3D arena has to keep rendering while a response is generated, so the interface cannot block on the model.',
+      'Feedback has to be structured — clarity, logic, evidence, impact — before it can be shown as a scorecard.',
+    ],
+    outcome:
+      'A debate you can hold against an AI opponent, scored on four dimensions, with the whole session running in the browser. The deployed demo is linked below.',
     cover: { from: '#2A1005', via: '#4A1D08', to: '#05060A', mark: 'DEBATE' },
   },
 
@@ -113,6 +131,13 @@ export const projects = [
       live: 'https://drive.google.com/file/d/1i5czKpk2k_Pkq38Buh9PpnFJIZ5UEWsr/view?usp=sharing',
     },
     screen: { mode: 'mobile', accent: '#4B8CFF' },
+    constraints: [
+      'No external news API, so the publishing model is the product — articles, polls and video are all authored in-app.',
+      'Two roles, user and administrator, share one content model without duplicating screens.',
+      'Video arrives as YouTube links rather than uploads, which keeps the app light and the publishing flow short.',
+    ],
+    outcome:
+      'A native Android app with three content types and its own publishing flow; the linked video shows it running.',
     cover: { from: '#0A1030', via: '#152056', to: '#05060A', mark: 'PINCH' },
   },
 ]

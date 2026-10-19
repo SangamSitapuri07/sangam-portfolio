@@ -49,3 +49,44 @@ export const skillCategories = [
 export const coreLanguages = ['C++', 'C', 'Java', 'JavaScript', 'Python']
 
 export default skillCategories
+
+/**
+ * The Engineering Core — scene 04's three columns.
+ *
+ * Deliberately three, not four: the scene's whole argument is "the language, the
+ * interface, and the thinking that holds them together". Everything listed is
+ * from the CV's SKILLS section; the descriptions say what the skill is *for*, not
+ * how good I am at it.
+ */
+export const coreGroups = [
+  {
+    id: 'programming',
+    number: '01',
+    title: 'Programming',
+    note: 'The language layer: data structures, memory and the fundamentals that outlive frameworks.',
+    accent: '#FFB25E',
+    items: ['C', 'C++', 'Java', 'Python', 'SQL'],
+    detail:
+      'Used for algorithmic problem solving — 200+ problems across LeetCode and GeeksforGeeks, and a 4★ HackerRank rating in Python.',
+  },
+  {
+    id: 'frontend',
+    number: '02',
+    title: 'Frontend',
+    note: 'The interface layer: React, and 3D on the web when a page needs to be a place.',
+    accent: '#4B8CFF',
+    items: ['React', 'JavaScript', 'Three.js'],
+    detail:
+      'React Three Fiber and Three.js for the debate arena, React for the surrounding product, plain JavaScript underneath both.',
+  },
+  {
+    id: 'core',
+    number: '03',
+    title: 'Core concepts',
+    note: 'The layer between: how state, requests and rules move through a system.',
+    accent: '#54E0A0',
+    items: ['Data structures', 'OOP', 'Client–server', 'Real-time state', 'Input validation'],
+    detail:
+      'Server-authoritative rules, rating and ranking logic, and REST APIs behind Express — the parts that have to be correct before the interface can be pleasant.',
+  },
+]

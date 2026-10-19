@@ -20,13 +20,15 @@
 
 import * as THREE from 'three'
 
+import { sceneState } from '@/lib/scrollEngine'
+
 import { screens as screenConfig } from '@/config/laptop'
-import { scenes } from '@/config/scenes'
 import { screenTheme as theme } from '@/config/screen'
 import { profile } from '@/data/profile'
 import { projects } from '@/data/projects'
 import { skillCategories } from '@/data/skills'
-import { timeline, achievements } from '@/data/timeline'
+import { timeline } from '@/data/timeline'
+import { chapters } from '@/data/chapters'
 
 /* ------------------------------------------------------------------ *
  * Hardware column geometry (fractions of the display width)
@@ -89,7 +91,12 @@ function truncate(ctx, value, maxWidth, font) {
  * Module
  * ------------------------------------------------------------------ */
 
-export function createScreenTextures({ quality, renderer, getProgress = () => 0, getLoaderProgress = () => 1 } = {}) {
+export function createScreenTextures({ quality, renderer } = {}) {
+  /* Progress comes from the shared scroll state rather than a React ref: the
+     canvases are painted outside the render pass, and reading a ref inside a memo
+     is exactly the kind of render-time read that makes a component lie about its
+     dependencies. */
+  const readProgress = () => sceneState.film?.progress ?? 0
   const maxAnisotropy = renderer?.capabilities?.getMaxAnisotropy?.() ?? 1
   const scale = clamp(quality?.screenQuality ?? 1, 0.5, 1)
 
@@ -208,7 +215,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     }
 
     // Overall scroll progress, drawn along the top edge of the display
-    const progress = clamp(getProgress(), 0, 1)
+    const progress = clamp(readProgress(), 0, 1)
     ctx.fillStyle = accent
     ctx.globalAlpha = 0.9
     ctx.fillRect(0, barH - 2, W * progress, 2)
@@ -217,46 +224,54 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
 
   /* The display is nearly square, so below the content there was a band of dead
      space on every screen. The chapter rail fills it with something true: where
-     this scene sits in the film. It is read from the screen key, so it costs
-     nothing to keep in step. */
-  function drawFilmRail(ctx, key, accent) {
-    if (key === 'boot' || !key) return
-    const chapters = scenes.filter((scene) => scene.nav)
-    if (chapters.length < 2) return
-    const active = key.split(':')[0]
+     this scene sits in the ten-scene film. It reads the *screen key*, so it can
+     never disagree with what the camera is doing. */
+  function drawChapterRail(ctx, key, accent) {
+    if (!key) return
+    const active = key.startsWith('projects:') ? 'universe' : key
+    const activeIndex = chapters.findIndex((chapter) => chapter.id === active)
+    if (activeIndex === -1) return
+
     const railH = H * 0.078
     const y = H - H * 0.058 - railH
     const gutter = H * 0.04
-    const width = (W - gutter * 2) / chapters.length
+    const width = W - gutter * 2
+    const slot = width / chapters.length
+
     ctx.fillStyle = theme.line
-    ctx.fillRect(gutter, y, W - gutter * 2, 1)
-    ctx.fillRect(gutter, y + railH * 0.88, W - gutter * 2, 1)
-    chapters.forEach((scene, index) => {
-      const x = gutter + index * width
-      const on = scene.id === active
-      if (index) {
-        ctx.fillStyle = theme.line
-        ctx.fillRect(x - 1, y + railH * 0.22, 1, railH * 0.44)
-      }
-      if (on) {
-        ctx.fillStyle = accent
-        ctx.fillRect(x, y, width * 0.58, 2)
-      }
-      text(ctx, String(index + 1).padStart(2, '0'), x, y + railH * 0.52, {
-        size: Math.round(H * 0.0165),
+    ctx.fillRect(gutter, y + railH * 0.52, width, 1)
+
+    chapters.forEach((chapter, index) => {
+      const x = gutter + slot * index + slot / 2
+      const on = index === activeIndex
+      const done = index < activeIndex
+
+      ctx.fillStyle = on ? accent : done ? theme.inkSoft : theme.line
+      const tickH = on ? railH * 0.22 : railH * 0.12
+      ctx.fillRect(x - (on ? 1 : 0.5), y + railH * 0.52 - tickH / 2, on ? 2 : 1, tickH)
+
+      text(ctx, chapter.number, x, y + railH * 0.3, {
+        size: Math.round(H * 0.017),
         mono: true,
-        color: on ? accent : theme.inkFaint,
-        spacing: 1,
+        align: 'center',
+        color: on ? accent : done ? theme.inkSoft : theme.inkFaint,
+        alpha: done ? 0.85 : 1,
       })
-      text(ctx, scene.nav.label, x + H * 0.034, y + railH * 0.52, {
-        size: Math.round(H * 0.019),
-        color: on ? theme.ink : theme.inkFaint,
-      })
+    })
+
+    /* The active chapter, named once — ten labels side by side would collide. */
+    const chapter = chapters[activeIndex]
+    text(ctx, `${chapter.number} · ${chapter.label.toUpperCase()}`, W - gutter, y - H * 0.018, {
+      size: Math.round(H * 0.019),
+      mono: true,
+      align: 'right',
+      color: accent,
+      spacing: 1.2,
     })
   }
 
   function drawFooter(ctx, left, right = '', accent = theme.accent) {
-    drawFilmRail(ctx, currentKey, accent)
+    drawChapterRail(ctx, currentKey, accent)
     const barH = H * 0.058
     const y = H - barH
     ctx.fillStyle = 'rgba(8,11,18,0.9)'
@@ -384,9 +399,6 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     ctx.restore()
   }
 
-  /** Characters a pane holds at a given size — Inter averages about 0.56 em. */
-  const charsFor = (widthPx, sizePx) => Math.max(8, Math.floor(widthPx / (sizePx * 0.56)))
-
   function wholeWords(value, budget) {
     let out = ''
     for (const word of String(value).split(' ')) {
@@ -411,7 +423,18 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     x,
     y,
     maxWidth,
-    { size = 0.024, color = theme.inkSoft, lineHeight = 1.5, mono = false, weight = 400, maxLines = Infinity, spacing = 0 } = {}
+    {
+      size = 0.024,
+      color = theme.inkSoft,
+      lineHeight = 1.5,
+      mono = false,
+      weight = 400,
+      maxLines = Infinity,
+      spacing = 0,
+      /* The chapter rail and footer own the bottom of the panel; body copy stops
+         above them by default so no paragraph can ever run under the rail. */
+      maxY = H * 0.82,
+    } = {}
   ) {
     const fontSize = Math.round(H * size)
     ctx.save()
@@ -437,6 +460,10 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
         line = word
         lines += 1
         cursor += fontSize * lineHeight
+        if (cursor > maxY) {
+          ctx.restore()
+          return cursor
+        }
       } else {
         line = test
       }
@@ -571,7 +598,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     const barH = 3
     ctx.fillStyle = 'rgba(255,255,255,0.08)'
     ctx.fillRect(cx - barWidth / 2, barY, barWidth, barH)
-    const pct = clamp(getLoaderProgress(), 0, 1)
+    const pct = clamp(sceneState.loaderProgress ?? 1, 0, 1)
     ctx.fillStyle = accent
     ctx.fillRect(cx - barWidth / 2, barY, barWidth * pct, barH)
 
@@ -584,7 +611,7 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     const logs = [
       'webgl context ................ ok',
       'cyberpunk_laptop.glb ......... ok',
-      'timeline · 7 scenes .......... ready',
+      'timeline · 10 chapters ....... ready',
     ]
     logs.forEach((line, index) => {
       text(ctx, line, cx, H * 0.72 + index * H * 0.038, {
@@ -796,15 +823,20 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
         maxLines: 3,
       })
       let cy = noteEnd + H * 0.0175 * 1.4 + H * 0.016
+      /* Items go through `bodyText`, so a long one wraps instead of running into
+         its neighbour, and the list stops above the chapter rail. */
       category.items.forEach((item) => {
+        if (cy > H * 0.78) return
         ctx.fillStyle = `${category.accent}bb`
         ctx.fillRect(x, cy - H * 0.019, H * 0.008, H * 0.022)
-        text(ctx, item, x + H * 0.028, cy, {
-          size: Math.round(H * 0.024),
+        const end = bodyText(ctx, item, x + H * 0.028, cy, maxWidth - H * 0.028, {
+          size: 0.024,
           color: theme.ink,
-          maxWidth: maxWidth - H * 0.028,
+          lineHeight: 1.25,
+          maxLines: 2,
+          maxY: H * 0.8,
         })
-        cy += H * 0.038
+        cy = end + H * 0.03
       })
       return cy
     }
@@ -841,10 +873,16 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     })
 
     y3 += H * 0.38
-    label(ctx, 'ALSO USING', cx3, y3)
-    y3 += H * 0.045
+    /* Keep the chip cloud clear of the chapter rail that closes the panel. */
+    const alsoTop = Math.min(y3, H * 0.66)
+    label(ctx, 'ALSO USING', cx3, alsoTop)
     const also = [...new Set(skillCategories.flatMap((category) => category.also))].slice(0, 5)
-    flowChips(ctx, also, cx3, y3, colWidth[2], { accent, size: 0.0145, gap: 0.012 })
+    flowChips(ctx, also, cx3, alsoTop + H * 0.045, colWidth[2], {
+      accent,
+      size: 0.0145,
+      gap: 0.012,
+      bottom: H * 0.78,
+    })
 
     drawFooter(ctx, 'tools · languages · platforms', 'frontend · backend · programming · dev', accent)
   }
@@ -922,9 +960,15 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
 
     /* Label on its own line above the figure: side by side, "route verification"
        and "2 km" only just fit at full resolution and collided at lower ones. */
-    let sy = y3 + H * 0.335
-    project.stats?.slice(0, 3).forEach((stat, index) => {
-      const rowY = sy + index * H * 0.112
+    /* The rail and footer own the bottom of the panel, so the stats block is
+       measured against them instead of drifting down from the diagram: three
+       rows have to finish above 0.82 of the height at every quality tier. */
+    const statRows = (project.stats || []).slice(0, 3)
+    const statTop = Math.max(y3 + H * 0.335, H * 0.62)
+    const statStep = Math.min(H * 0.112, (H * 0.82 - statTop) / Math.max(statRows.length, 1))
+    let sy = statTop
+    statRows.forEach((stat, index) => {
+      const rowY = sy + index * statStep
       text(ctx, stat.label, cx3, rowY, {
         size: Math.round(H * 0.019),
         mono: true,
@@ -932,8 +976,8 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
         spacing: 1.2,
         maxWidth: colWidth[2],
       })
-      text(ctx, stat.value, cx3, rowY + H * 0.052, {
-        size: Math.round(H * 0.05),
+      text(ctx, stat.value, cx3, rowY + Math.min(H * 0.052, statStep * 0.62), {
+        size: Math.round(Math.min(H * 0.05, statStep * 0.55)),
         weight: 600,
         color: theme.ink,
         maxWidth: colWidth[2],
@@ -1073,99 +1117,6 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     ctx.restore()
   }
 
-  function paintExperience(ctx) {
-    const accent = theme.accent
-    drawBackdrop(ctx, accent)
-    drawChrome(ctx, { accent, breadcrumb: '~/timeline', right: `${timeline.length} entries` })
-
-    const certs = timeline.filter((item) => item.kind === 'certification')
-    const others = timeline.filter((item) => item.kind !== 'certification')
-
-    /* A rail of four entries rather than five: titles and organisations are long
-       enough to need two lines each ("Smart India Hackathon — ISRO problem
-       statement"), and a flow layout keeps the rows from touching. */
-    const paintRail = (items, x, y, maxWidth, title) => {
-      label(ctx, title, x, y)
-      ctx.fillStyle = theme.line
-      ctx.fillRect(x + 5, y + H * 0.032, 1, H * 0.56)
-      const indent = H * 0.03
-      let rowY = y + H * 0.075
-      items.slice(0, 4).forEach((item, index) => {
-        ctx.beginPath()
-        ctx.fillStyle = index === 0 ? accent : 'rgba(255,255,255,0.28)'
-        ctx.arc(x + 5.5, rowY - H * 0.008, index === 0 ? 4.5 : 3, 0, Math.PI * 2)
-        ctx.fill()
-        text(ctx, item.period, x + indent, rowY - H * 0.028, {
-          size: Math.round(H * 0.0175),
-          mono: true,
-          color: theme.inkFaint,
-          spacing: 1,
-        })
-        /* A 2% safety margin on the estimate: one word too many is an ellipsis. */
-        const titleBudget = Math.floor(1.96 * charsFor(maxWidth - indent, H * 0.021))
-        const titleEnd = bodyText(
-          ctx,
-          screenForm(item.title, titleBudget),
-          x + indent,
-          rowY,
-          maxWidth - indent,
-          { size: 0.021, weight: 500, color: theme.ink, lineHeight: 1.22, maxLines: 2 }
-        )
-        const orgEnd = bodyText(
-          ctx,
-          screenForm(item.organisation, Math.floor(1.9 * charsFor(maxWidth - indent, H * 0.0185))),
-          x + indent,
-          titleEnd + H * 0.021 * 1.22 + H * 0.006,
-          maxWidth - indent,
-          { size: 0.0185, color: theme.inkFaint, lineHeight: 1.3, maxLines: 2 }
-        )
-        rowY = orgEnd + H * 0.0185 * 1.3 + H * 0.028
-      })
-    }
-
-    paintRail(certs, colX[0], H * 0.2, colWidth[0], 'CERTIFICATIONS')
-    paintRail(others.slice(0, 4), colX[1], H * 0.2, colWidth[1], 'TRAINING & HACKATHONS')
-
-    // Column C — achievements
-    const cx3 = colX[2]
-    label(ctx, 'ACHIEVEMENTS', cx3, H * 0.2)
-    let ay = H * 0.27
-    achievements.slice(0, 3).forEach((item) => {
-      const figure = String(item.value).replace(/★/g, '').trim()
-      const stars = (String(item.value).match(/★/g) || []).length
-      const figureSize = Math.round(H * 0.062)
-      text(ctx, figure, cx3, ay, {
-        size: Math.round(H * 0.062),
-        weight: 600,
-        color: accent,
-        maxWidth: colWidth[2],
-      })
-      if (stars) {
-        ctx.font = `600 ${px(figureSize)} ${theme.fontSans}`
-        let starX = cx3 + ctx.measureText(figure).width + figureSize * 0.22
-        for (let i = 0; i < stars; i += 1) {
-          star(ctx, starX + figureSize * 0.3, ay - figureSize * 0.3, figureSize * 0.32, accent)
-          starX += figureSize * 0.72
-        }
-      }
-      const labelEnd = bodyText(ctx, item.label, cx3, ay + H * 0.034, colWidth[2], {
-        size: 0.022,
-        color: theme.ink,
-        lineHeight: 1.25,
-        maxLines: 2,
-      })
-      const detailEnd = bodyText(ctx, item.detail, cx3, labelEnd + H * 0.022 * 1.25 + H * 0.006, colWidth[2], {
-        size: 0.0185,
-        color: theme.inkFaint,
-        lineHeight: 1.35,
-        maxLines: 2,
-      })
-      ay = detailEnd + H * 0.0185 * 1.35 + H * 0.046
-    })
-
-    drawFooter(ctx, 'education · certifications · hackathons', 'newest first', accent)
-  }
-
   function paintContact(ctx, t) {
     const accent = theme.accent
     drawBackdrop(ctx, accent)
@@ -1262,6 +1213,374 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     drawFooter(ctx, 'thanks for scrolling', `updated ${new Date().getFullYear()}`, accent)
   }
 
+  /* ---------------- Scenes 03, 06, 07, 10 ---------------- */
+
+  /**
+   * Scene 03 — the machine is being taken apart. The display shows an
+   * assembly manifest: which part is where, and how far out it has travelled.
+   * It is a manifest of the meshes that actually exist in the model, so the
+   * screen never describes hardware the file does not contain.
+   */
+  function paintBreakdown(ctx) {
+    const accent = theme.accent
+    drawBackdrop(ctx, accent)
+    drawChrome(ctx, { accent, breadcrumb: '~/system/disassemble', right: 'teardown' })
+
+    let y = H * 0.2
+    sectionHeading(ctx, 'Breakdown', colX[0], y, { accent })
+    y += H * 0.09
+    y = bodyText(ctx, 'Every component has a purpose. Each one is moving along a fixed trajectory, and every trajectory is reversible.', colX[0], y, colWidth[0], {
+      size: 0.0215,
+      color: theme.inkSoft,
+    })
+    y += H * 0.07
+    label(ctx, 'MANIFEST', colX[0], y)
+    y += H * 0.045
+
+    const partsList = [
+      ['01', 'Lid assembly', 'lifted + rotated'],
+      ['02', 'Display panes', 'out of the bezel'],
+      ['03', 'Keyboard', 'raised off the deck'],
+      ['04', 'Deck plate', 'floating clear'],
+      ['05', 'Chassis shell', 'stationary datum'],
+      ['06', 'Bottom plate', 'lowered'],
+      ['07', 'Accent strip', 'released sideways'],
+    ]
+    const manifestStep = Math.min(H * 0.058, Math.max(H * 0.044, (H * 0.78 - y) / partsList.length))
+    partsList.forEach(([index, name, state], row) => {
+      const rowY = y + row * manifestStep
+      text(ctx, index, colX[0], rowY, { size: Math.round(H * 0.019), mono: true, color: theme.inkFaint, spacing: 1 })
+      text(ctx, name, colX[0] + H * 0.055, rowY, {
+        size: Math.round(H * 0.0235),
+        color: row === 4 ? accent : theme.ink,
+        weight: row === 4 ? 500 : 400,
+        maxWidth: colWidth[0] - H * 0.055,
+      })
+      text(ctx, state, colX[0] + H * 0.055, rowY + H * 0.026, {
+        size: Math.round(H * 0.017),
+        mono: true,
+        color: theme.inkFaint,
+      })
+    })
+
+    /* Column B — a small exploded diagram, drawn from the same order. */
+    const bx = colX[1] + colWidth[1] * 0.5
+    const top = H * 0.26
+    label(ctx, 'TRAJECTORY', colX[1], H * 0.2)
+    const rows = [
+      { y: 0.0, w: 0.62, label: 'lid' },
+      { y: 0.17, w: 0.58, label: 'display' },
+      { y: 0.38, w: 0.86, label: 'keyboard' },
+      { y: 0.55, w: 0.92, label: 'deck' },
+      { y: 0.72, w: 0.96, label: 'chassis' },
+      { y: 0.89, w: 0.9, label: 'bottom' },
+    ]
+    const diagramW = colWidth[1] * 0.92
+    rows.forEach((row, index) => {
+      const rowY = top + row.y * H * 0.56
+      const w = diagramW * row.w
+      const x = bx - w / 2
+      ctx.fillStyle = index === 4 ? `${accent}33` : 'rgba(255,255,255,0.05)'
+      ctx.fillRect(x, rowY, w, H * 0.035)
+      ctx.strokeStyle = index === 4 ? accent : 'rgba(255,255,255,0.16)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(x + 0.5, rowY + 0.5, w - 1, H * 0.034)
+      text(ctx, row.label, x + H * 0.014, rowY + H * 0.024, {
+        size: Math.round(H * 0.016),
+        mono: true,
+        color: index === 4 ? accent : theme.inkFaint,
+      })
+    })
+    // Vertical guide lines between the layers
+    ctx.strokeStyle = 'rgba(53,231,255,0.28)'
+    ctx.setLineDash([3, 4])
+    ;[0.22, 0.78].forEach((fraction) => {
+      const x = bx - diagramW / 2 + diagramW * fraction
+      ctx.beginPath()
+      ctx.moveTo(x, top + H * 0.04)
+      ctx.lineTo(x, top + H * 0.53)
+      ctx.stroke()
+    })
+    ctx.setLineDash([])
+
+    /* Column C — what the operation is for. */
+    const cx3 = colX[2]
+    let y3 = H * 0.2
+    label(ctx, 'WHY', cx3, y3)
+    y3 += H * 0.06
+    const notes = [
+      'A system is only as strong as the parts you understand.',
+      'Read the machine before you trust it.',
+      'Scroll back and it rebuilds itself.',
+    ]
+    notes.forEach((note, index) => {
+      ctx.fillStyle = `${accent}${index === 0 ? 'ff' : '44'}`
+      ctx.fillRect(cx3, y3 - H * 0.024, H * 0.006, H * 0.028)
+      y3 = bodyText(ctx, note, cx3 + H * 0.026, y3, colWidth[2] - H * 0.03, {
+        size: 0.021,
+        color: theme.inkSoft,
+        lineHeight: 1.4,
+        maxLines: 4,
+      })
+      y3 += H * 0.075
+    })
+
+    y3 += H * 0.02
+    label(ctx, 'PARTS IN THE FILE', cx3, y3)
+    y3 += H * 0.045
+    text(ctx, '37 meshes · 2 groups', cx3, y3, {
+      size: Math.round(H * 0.021),
+      mono: true,
+      color: theme.ink,
+    })
+
+    drawFooter(ctx, 'disassembly in progress', 'reversible · deterministic', accent)
+  }
+
+  /** Scene 06 — the flagship project, laid out as a case study. */
+  function paintDeepDive(ctx, project) {
+    const accent = project.screen?.accent || theme.accent
+    drawBackdrop(ctx, accent)
+    drawChrome(ctx, {
+      accent,
+      breadcrumb: `~/projects/${project.id}/deep-dive`,
+      right: 'case study',
+    })
+
+    let y = H * 0.2
+    label(ctx, 'FLAGSHIP', colX[0], y)
+    y += H * 0.06
+    y = bodyText(ctx, project.name, colX[0], y, colWidth[0], {
+      size: 0.052,
+      weight: 600,
+      color: theme.ink,
+      lineHeight: 1.1,
+      maxLines: 2,
+    })
+    y += H * 0.04
+    y = bodyText(ctx, project.subtitle, colX[0], y, colWidth[0], {
+      size: 0.021,
+      color: accent,
+      weight: 500,
+      maxLines: 2,
+    })
+    y += H * 0.05
+    y = bodyText(ctx, project.tagline, colX[0], y, colWidth[0], {
+      size: 0.0215,
+      color: theme.inkSoft,
+      lineHeight: 1.45,
+      maxLines: 5,
+    })
+    y += H * 0.06
+    label(ctx, 'STACK', colX[0], y)
+    y += H * 0.045
+    flowChips(ctx, project.tech, colX[0], y, colWidth[0], { accent, size: 0.0145, gap: 0.012, bottom: H * 0.8 })
+
+    /* Column B — problem, approach, outcome. */
+    const bx = colX[1]
+    let by = H * 0.2
+    label(ctx, 'PROBLEM · APPROACH', bx, by)
+    by += H * 0.055
+    by = bodyText(ctx, profile.about.headline, bx, by, colWidth[1], {
+      size: 0.0215,
+      color: theme.ink,
+      weight: 500,
+      lineHeight: 1.35,
+      maxLines: 3,
+    })
+    by += H * 0.05
+    const rows = [
+      ['Problem', 'Practising a debate gives you no opponent and no feedback loop.'],
+      ['Approach', 'A live 3D arena, generated counter-arguments, and a scored rubric.'],
+      ['Built with', 'React Three Fiber on the client, Gemini and Groq behind Express.'],
+      ['Outcome', 'Clarity, logic, evidence and impact are scored after every round.'],
+    ]
+    rows.forEach(([labelText, body]) => {
+      text(ctx, labelText, bx, by, { size: Math.round(H * 0.0185), mono: true, color: accent, spacing: 1.2 })
+      by += H * 0.032
+      by = bodyText(ctx, body, bx, by, colWidth[1], {
+        size: 0.0195,
+        color: theme.inkSoft,
+        lineHeight: 1.34,
+        maxLines: 3,
+      })
+      by += H * 0.03
+    })
+
+    /* Column C — the scorecard, drawn as the product's own idea. */
+    const cx3 = colX[2]
+    let y3 = H * 0.2
+    label(ctx, 'SCORECARD', cx3, y3)
+    y3 += H * 0.06
+    const scorecard = [
+      ['Clarity', 0.86],
+      ['Logic', 0.78],
+      ['Evidence', 0.7],
+      ['Impact', 0.82],
+    ]
+    scorecard.forEach(([name, value], index) => {
+      const rowY = y3 + index * H * 0.075
+      text(ctx, name, cx3, rowY, { size: Math.round(H * 0.021), color: theme.inkSoft })
+      text(ctx, String(Math.round(value * 100)), cx3 + colWidth[2], rowY, {
+        size: Math.round(H * 0.021),
+        mono: true,
+        align: 'right',
+        color: theme.inkFaint,
+      })
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'
+      ctx.fillRect(cx3, rowY + H * 0.014, colWidth[2], 3)
+      ctx.fillStyle = accent
+      ctx.fillRect(cx3, rowY + H * 0.014, colWidth[2] * value, 3)
+    })
+    y3 += H * 0.34
+    label(ctx, 'ROLE', cx3, y3)
+    y3 += H * 0.04
+    bodyText(ctx, project.role, cx3, y3, colWidth[2], {
+      size: 0.0205,
+      color: theme.ink,
+      lineHeight: 1.35,
+      maxLines: 3,
+    })
+
+    drawFooter(ctx, 'problem · approach · implementation', 'outcome · links', accent)
+  }
+
+  /** Scene 07 — the machine is going back together. */
+  function paintRebuild(ctx) {
+    const accent = theme.accent
+    drawBackdrop(ctx, accent)
+    drawChrome(ctx, { accent, breadcrumb: '~/system/reassemble', right: 'rebuild' })
+
+    let y = H * 0.2
+    sectionHeading(ctx, 'Reassembly', colX[0], y, { accent })
+    y += H * 0.09
+    y = bodyText(ctx, 'The same trajectories, played backwards. Every component returns to the position it held before the machine was opened.', colX[0], y, colWidth[0], {
+      size: 0.0215,
+      color: theme.inkSoft,
+    })
+    y += H * 0.08
+    label(ctx, 'SEQUENCE', colX[0], y)
+    y += H * 0.05
+    const steps = [
+      ['01', 'Hardware returns'],
+      ['02', 'Bottom plate seats'],
+      ['03', 'Deck plate drops in'],
+      ['04', 'Keyboard locks'],
+      ['05', 'Display seats in the bezel'],
+      ['06', 'Lid swings closed'],
+    ]
+    const sequenceStep = Math.min(H * 0.058, Math.max(H * 0.044, (H * 0.78 - y) / steps.length))
+    steps.forEach(([index, name], row) => {
+      const rowY = y + row * sequenceStep
+      text(ctx, index, colX[0], rowY, { size: Math.round(H * 0.019), mono: true, color: theme.inkFaint, spacing: 1 })
+      ctx.fillStyle = `${accent}${row === steps.length - 1 ? 'ff' : '44'}`
+      ctx.fillRect(colX[0] + H * 0.036, rowY - H * 0.008, H * 0.008, H * 0.008)
+      text(ctx, name, colX[0] + H * 0.055, rowY, {
+        size: Math.round(H * 0.0235),
+        color: theme.ink,
+        maxWidth: colWidth[0] - H * 0.06,
+      })
+    })
+
+    /* Column B — a progress ladder that fills as the assembly completes. */
+    const bx = colX[1]
+    let by = H * 0.2
+    label(ctx, 'ASSEMBLY', bx, by)
+    by += H * 0.06
+    for (let i = 0; i < 8; i += 1) {
+      const rowY = by + i * H * 0.062
+      const filled = 8 - i
+      ctx.fillStyle = filled > 5 ? `${accent}55` : 'rgba(255,255,255,0.05)'
+      ctx.fillRect(bx, rowY, (colWidth[1] * filled) / 8, H * 0.034)
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(bx + 0.5, rowY + 0.5, colWidth[1] - 1, H * 0.033)
+    }
+    by += H * 0.55
+    bodyText(ctx, 'One scalar drives all of it. There is no second animation to keep in sync.', bx, by, colWidth[1], {
+      size: 0.0195,
+      color: theme.inkFaint,
+      lineHeight: 1.35,
+      maxLines: 4,
+    })
+
+    /* Column C — the startup sequence. */
+    const cx3 = colX[2]
+    let y3 = H * 0.2
+    label(ctx, 'BOOT', cx3, y3)
+    y3 += H * 0.06
+    const logs = [
+      'display ................. seated',
+      'hinge ................... locked',
+      'chassis ................. closed',
+      'backlight ............... on',
+      'system .................. ready',
+    ]
+    logs.forEach((line, index) => {
+      text(ctx, line, cx3, y3 + index * H * 0.05, {
+        size: Math.round(H * 0.0185),
+        mono: true,
+        color: index === logs.length - 1 ? accent : theme.inkFaint,
+        alpha: 0.6 + index * 0.1,
+      })
+    })
+    y3 += H * 0.32
+    text(ctx, 'NO MISSING PARTS', cx3, y3, {
+      size: Math.round(H * 0.019),
+      mono: true,
+      color: theme.positive,
+      spacing: 1.6,
+    })
+
+    drawFooter(ctx, 'reassembly in progress', 'same trajectories, reversed', accent)
+  }
+
+  /** Scene 10 — the quiet end. Almost nothing on the display. */
+  function paintAfterglow(ctx) {
+    const accent = theme.accent
+    drawBackdrop(ctx, accent)
+    drawChrome(ctx, { accent, breadcrumb: '~', right: 'standby' })
+
+    const cx = W / 2
+    text(ctx, profile.initials, cx, H * 0.36, {
+      size: Math.round(H * 0.11),
+      weight: 600,
+      align: 'center',
+      color: theme.ink,
+      spacing: 6,
+    })
+    text(ctx, 'THE NEXT BUILD STARTS HERE', cx, H * 0.45, {
+      size: Math.round(H * 0.024),
+      mono: true,
+      align: 'center',
+      color: accent,
+      spacing: 3,
+    })
+    text(ctx, `${profile.name} · ${profile.role}`, cx, H * 0.52, {
+      size: Math.round(H * 0.021),
+      align: 'center',
+      color: theme.inkSoft,
+    })
+    text(ctx, profile.contact.email, cx, H * 0.56, {
+      size: Math.round(H * 0.021),
+      mono: true,
+      align: 'center',
+      color: theme.inkFaint,
+    })
+
+    /* An idle waveform, barely moving. */
+    const bars = 44
+    const barW = (W * 0.5) / bars
+    for (let i = 0; i < bars; i += 1) {
+      const value = 0.5 + 0.5 * Math.sin(i * 0.55)
+      const h = value * H * 0.05
+      ctx.fillStyle = i % 11 === 0 ? accent : 'rgba(255,255,255,0.12)'
+      ctx.fillRect(cx - (W * 0.25) + i * barW, H * 0.66 - h / 2, barW * 0.5, h)
+    }
+
+    drawFooter(ctx, 'standby', 'scroll up to replay', accent)
+  }
+
   /* ---------------- Status panel ---------------- */
 
   function paintStatus(ctx, key) {
@@ -1299,9 +1618,9 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
     ctx.stroke()
     ctx.strokeStyle = accent
     ctx.beginPath()
-    ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(getProgress(), 0, 1))
+    ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(readProgress(), 0, 1))
     ctx.stroke()
-    text(ctx, `${Math.round(clamp(getProgress(), 0, 1) * 100)}%`, cx, cy + 10 * scale, {
+    text(ctx, `${Math.round(clamp(readProgress(), 0, 1) * 100)}%`, cx, cy + 10 * scale, {
       size: Math.round(52 * scale),
       weight: 600,
       align: 'center',
@@ -1328,21 +1647,27 @@ export function createScreenTextures({ quality, renderer, getProgress = () => 0,
 
   /* ---------------- Dispatch ---------------- */
 
+  const PAINTERS = {
+    awakening: (ctx) => paintBoot(ctx),
+    engine: (ctx) => paintHero(ctx, 0),
+    breakdown: (ctx) => paintBreakdown(ctx),
+    core: (ctx) => paintSkills(ctx),
+    'deep-dive': (ctx) => paintDeepDive(ctx, projects[0]),
+    rebuild: (ctx) => paintRebuild(ctx),
+    beyond: (ctx) => paintAbout(ctx),
+    transmission: (ctx) => paintContact(ctx, 0),
+    afterglow: (ctx) => paintAfterglow(ctx),
+  }
+
   function paintMain(key, t) {
     const ctx = mainCtx
     ctx.save()
     if (key === 'boot') paintBoot(ctx)
-    else if (key === 'hero') paintHero(ctx, t)
-    else if (key === 'about') paintAbout(ctx)
-    else if (key === 'skills') paintSkills(ctx)
-    else if (key === 'experience') paintExperience(ctx)
-    else if (key === 'contact') paintContact(ctx, t)
     else if (key.startsWith('projects:')) {
       const index = Number(key.split(':')[1])
       paintProject(ctx, projects[index] || projects[0], t)
-    } else {
-      paintHero(ctx, t)
-    }
+    } else if (PAINTERS[key]) PAINTERS[key](ctx)
+    else paintHero(ctx, t)
     ctx.restore()
   }
 

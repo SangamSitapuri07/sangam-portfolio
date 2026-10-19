@@ -2,17 +2,19 @@
  * The director.
  *
  * One function, called once per frame, turns scroll progress into everything the
- * scene does: camera position, hinge angle, machine pose, studio lighting and the
- * interface on the laptop screen. It is the single writer for animated values —
- * which is precisely why the mouse parallax, the scroll timeline and the DOM
- * overlays can never fight each other.
+ * scene does: camera position, hinge angle, machine pose, the exploded view,
+ * studio lighting, atmosphere and the interface on the laptop screen. It is the
+ * single writer for animated values — which is precisely why pointer parallax,
+ * the drag interaction and the scroll timeline can never fight each other.
  *
  * Design notes
  *   • no allocation in the frame loop — every intermediate lives on the instance,
- *   • damped values are kept separate from the mouse offsets, so parallax can
+ *   • damped values are kept separate from the pointer offsets, so parallax can
  *     never accumulate into the scroll pose,
  *   • anchors are resolved against the machine's LIVE matrix, so the camera keeps
- *     its aim while the laptop rotates and drifts through the storyboard.
+ *     its aim while the laptop rotates and drifts through the storyboard,
+ *   • the exploded view is created once per rig and driven by a single scalar, so
+ *     Scene 07 is Scene 03 running backwards by construction.
  */
 
 import * as THREE from 'three'
@@ -20,10 +22,21 @@ import * as THREE from 'three'
 import { damping as dampingConfig, reducedMotion as rmConfig } from '@/config/animation'
 import { parallax as parallaxConfig } from '@/config/laptop'
 import { defaultAnchors } from '@/lib/anchors'
+import { createExplodedView } from '@/lib/explodedView'
+import { createSilhouette } from '@/lib/silhouette'
 import { interaction } from '@/lib/interaction'
-import { buildKeyframes, findSegment, resolveCameraAt, getScreenState } from '@/lib/timeline'
+import {
+  buildKeyframes,
+  findSegment,
+  resolveCameraAt,
+  blendKeyframes,
+  getScreenState,
+} from '@/lib/timeline'
 
 const ANCHOR_KEYS = Object.keys(defaultAnchors)
+
+/** Machine silhouette, in world space, for the auto-framing camera. */
+const emptySubject = { centre: [0, 0.85, 0], min: [-1.02, 0, -0.9], max: [1.02, 1.7, 0.9] }
 
 const damp = (current, target, lambda, dt) =>
   current + (target - current) * (1 - Math.exp(-lambda * Math.max(dt, 0)))
@@ -45,11 +58,12 @@ export function createDirector({
   const camA = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32 }
   const camB = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32 }
   const camHero = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32 }
+  const blended = {}
   const vec = new THREE.Vector3()
   const anchorMatrix = new THREE.Matrix4()
   const anchorScratch = ANCHOR_KEYS.map(() => new THREE.Vector3())
 
-  const heroKey = keyframes.find((key) => key.sceneId === 'hero') || keyframes[0]
+  const heroKey = keyframes.find((key) => key.sceneId === 'engine') || keyframes[0]
 
   /** Published animation state. Read by components; never mirrored into React. */
   const film = {
@@ -57,7 +71,7 @@ export function createDirector({
     time: 0,
     /** Damped scroll pose of the machine (no parallax baked in). */
     machine: { rotX: 0, rotY: 0, rotZ: 0, posX: 0, posY: 0, posZ: 0 },
-    /** Mouse offsets, recomputed every frame and added on top. */
+    /** Pointer offsets, recomputed every frame and added on top. */
     offset: { rotX: 0, rotY: 0, posX: 0, posY: 0 },
     perspective: {
       pos: new THREE.Vector3(0, 1.2, 4),
@@ -67,18 +81,26 @@ export function createDirector({
       desiredTarget: new THREE.Vector3(0, 0.5, 0),
     },
     lid: 0,
+    explode: 0,
     light: { glow: 1, rim: 1, ambient: 0.6 },
+    /** Atmosphere intensities, 0…1, read by `Atmosphere`. */
+    fx: { particles: 0.4, grid: 0.5, circuits: 0.2, bloom: 0.9 },
     worldAnchors: { ...defaultAnchors },
     projectIndex: -1,
     screenKey: null,
+    keyframe: null,
   }
+
+  /* Publish the film on the shared state object too: DOM writers and the
+     atmosphere components read it directly instead of receiving props, which
+     keeps the frame loop out of React entirely. */
+  if (sceneState) sceneState.film = film
 
   let rig = null
   let camera = null
   let lights = null
-
-  /* Named `perspective` above rather than `camera`, so `film.camera` can never be
-     confused with the THREE camera instance. */
+  let exploded = null
+  let silhouette = null
 
   const measureWorldAnchors = () => {
     const source = rig?.anchors || defaultAnchors
@@ -102,7 +124,11 @@ export function createDirector({
     /** Wire the scene objects once they exist. Safe to call repeatedly. */
     register({ camera: threeCamera, rig: laptopRig, lights: lightRefs } = {}) {
       if (threeCamera) camera = threeCamera
-      if (laptopRig) rig = laptopRig
+      if (laptopRig && laptopRig !== rig) {
+        rig = laptopRig
+        exploded = createExplodedView(laptopRig)
+        silhouette = createSilhouette(laptopRig.machine)
+      }
       if (lightRefs) lights = lightRefs
       return api
     },
@@ -114,29 +140,26 @@ export function createDirector({
       film.time += dt
 
       const { a, b, t } = findSegment(keyframes, progress)
+      film.keyframe = { a, b, t }
+
+      const target = blendKeyframes(a, b, t, blended)
 
       /* ---- 1. Machine pose (scroll only) ---- */
       const lambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.laptop
       const machine = film.machine
-      const rotX = a.laptop.rotation[0] + (b.laptop.rotation[0] - a.laptop.rotation[0]) * t
-      const rotY = a.laptop.rotation[1] + (b.laptop.rotation[1] - a.laptop.rotation[1]) * t
-      const rotZ = a.laptop.rotation[2] + (b.laptop.rotation[2] - a.laptop.rotation[2]) * t
-      const posX = a.laptop.position[0] + (b.laptop.position[0] - a.laptop.position[0]) * t
-      const posZ = a.laptop.position[2] + (b.laptop.position[2] - a.laptop.position[2]) * t
-
-      machine.rotX = damp(machine.rotX, rotX, lambda, dt)
-      machine.rotY = damp(machine.rotY, rotY, lambda, dt)
-      machine.rotZ = damp(machine.rotZ, rotZ, lambda, dt)
-      machine.posX = damp(machine.posX, posX, lambda, dt)
-      machine.posZ = damp(machine.posZ, posZ, lambda, dt)
+      machine.rotX = damp(machine.rotX, target.rotation[0], lambda, dt)
+      machine.rotY = damp(machine.rotY, target.rotation[1], lambda, dt)
+      machine.rotZ = damp(machine.rotZ, target.rotation[2], lambda, dt)
+      machine.posX = damp(machine.posX, target.position[0], lambda, dt)
+      machine.posY = damp(machine.posY, target.position[1], lambda, dt)
+      machine.posZ = damp(machine.posZ, target.position[2], lambda, dt)
 
       /* ---- 2. Hinge ---- */
-      const targetLid = a.lid + (b.lid - a.lid) * t
       const lidLambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.lid
-      film.lid = damp(film.lid, targetLid, lidLambda, dt)
+      film.lid = damp(film.lid, target.lid, lidLambda, dt)
       rig?.applyLid?.(film.lid)
 
-      /* ---- 3. Mouse parallax: additive, smaller than the scroll motion ---- */
+      /* ---- 3. Pointer parallax: additive, smaller than the scroll motion ---- */
       const parallaxOn = !reducedMotion && parallax.enabled && quality?.id !== 'low' && Boolean(rig)
       const offset = film.offset
       offset.rotX = parallaxOn ? -pointer.y * parallax.rotationX : 0
@@ -157,24 +180,52 @@ export function createDirector({
       /* ---- 4. World-space anchors ---- */
       measureWorldAnchors()
 
-      /* ---- 4b. Direct manipulation ----
-       * Applied AFTER the anchors are measured, and deliberately excluded from
-       * `anchorMatrix`. The camera aims at anchors, so feeding a drag into them
-       * would swing the camera with the machine and the whole frame would rotate —
-       * the visitor would be turning the camera, not the object. Read here, the
-       * drag turns the machine and the camera stays composed on the storyboard,
-       * which is also what keeps every keyframe framed the way it was verified. */
+      /* ---- 5. Exploded view ----
+       * Driven by one scalar, after the hinge, and before the drag offsets are
+       * applied below — the parts belong to the machine, so they inherit the drag
+       * rather than fighting it. */
+      const explodeLambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.explode
+      film.explode = damp(film.explode, target.explode, explodeLambda, dt)
+      exploded?.apply(film.explode)
+      if (rig) rig.machine.updateMatrixWorld(true)
+
+      /* ---- 5a. Silhouette, *before* direct manipulation ----
+       * The lens is fitted to the machine as the storyboard poses it. The drag
+       * offsets are set below, after this measurement, so a visitor's thumb can
+       * never move the camera: dragging turns the object, not the shot. */
       if (rig) {
         const m = rig.machine
-        m.rotation.x += interaction.pitch + interaction.driftPitch
-        m.rotation.y += interaction.yaw + interaction.driftYaw
-        m.position.y += interaction.bob
+        m.rotation.set(machine.rotX + offset.rotX, machine.rotY + offset.rotY, machine.rotZ)
+        m.position.set(machine.posX + offset.posX, machine.posY + offset.posY, machine.posZ)
+        m.updateMatrixWorld(true)
+      }
+      const subject = silhouette ? silhouette.refresh() : emptySubject
+
+      /* ---- 5b. Direct manipulation ----
+       * Absolute values, not increments: these are re-derived from the storyboard
+       * pose every frame, so a drag can never accumulate into the scroll pose. */
+      if (rig) {
+        const m = rig.machine
+        m.rotation.set(
+          machine.rotX + offset.rotX + interaction.pitch + interaction.driftPitch,
+          machine.rotY + offset.rotY + interaction.yaw + interaction.driftYaw,
+          machine.rotZ
+        )
+        m.position.set(
+          machine.posX + offset.posX,
+          machine.posY + offset.posY + interaction.bob,
+          machine.posZ
+        )
         m.updateMatrixWorld(true)
       }
 
-      /* ---- 5. Camera ---- */
-      resolveCameraAt(a, film.worldAnchors, camA)
-      resolveCameraAt(b, film.worldAnchors, camB)
+      /* ---- 6. Camera ----
+       * The lens is fitted to the machine's *live* bounds, so an exploded view
+       * pulls back and a reassembled one moves in without any extra keyframes,
+       * and the composition stays inside its stage rectangle at any viewport. */
+      const viewport = camera?.aspect || 16 / 9
+      resolveCameraAt(a, subject, viewport, variant, camA)
+      resolveCameraAt(b, subject, viewport, variant, camB)
 
       let posXTarget = camA.pos[0] + (camB.pos[0] - camA.pos[0]) * t
       let posYTarget = camA.pos[1] + (camB.pos[1] - camA.pos[1]) * t
@@ -186,7 +237,7 @@ export function createDirector({
 
       if (reducedMotion) {
         // Hold the hero framing; let the storyboard move by a whisper only.
-        resolveCameraAt(heroKey, film.worldAnchors, camHero)
+        resolveCameraAt(heroKey, subject, viewport, variant, camHero)
         const scale = rmConfig.cameraTravelScale
         posXTarget = camHero.pos[0] + (posXTarget - camHero.pos[0]) * scale
         posYTarget = camHero.pos[1] + (posYTarget - camHero.pos[1]) * scale
@@ -219,14 +270,11 @@ export function createDirector({
         }
       }
 
-      /* ---- 6. Studio lighting ---- */
-      const glowTarget = a.light.glow + (b.light.glow - a.light.glow) * t
-      const rimTarget = a.light.rim + (b.light.rim - a.light.rim) * t
-      const ambientTarget = a.light.ambient + (b.light.ambient - a.light.ambient) * t
+      /* ---- 7. Studio lighting ---- */
       const lightLambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.glow
-      film.light.glow = damp(film.light.glow, glowTarget, lightLambda, dt)
-      film.light.rim = damp(film.light.rim, rimTarget, lightLambda, dt)
-      film.light.ambient = damp(film.light.ambient, ambientTarget, lightLambda, dt)
+      film.light.glow = damp(film.light.glow, target.light.glow, lightLambda, dt)
+      film.light.rim = damp(film.light.rim, target.light.rim, lightLambda, dt)
+      film.light.ambient = damp(film.light.ambient, target.light.ambient, lightLambda, dt)
 
       if (lights) {
         if (lights.ambient) lights.ambient.intensity = 0.34 * film.light.ambient
@@ -234,9 +282,17 @@ export function createDirector({
         if (lights.rimB) lights.rimB.intensity = 2.1 * film.light.rim
         if (lights.key) lights.key.intensity = 1.45 * film.light.glow
         if (lights.screenFill) lights.screenFill.intensity = 0.8 * film.light.glow
+        if (lights.underglow) lights.underglow.intensity = 1.1 * film.light.glow * (0.5 + film.fx.circuits)
       }
 
-      /* ---- 7. Screen content ---- */
+      /* ---- 8. Atmosphere ---- */
+      const fxLambda = reducedMotion ? dampingConfig.reducedMotion : dampingConfig.glow
+      film.fx.particles = damp(film.fx.particles, target.fx.particles, fxLambda, dt)
+      film.fx.grid = damp(film.fx.grid, target.fx.grid, fxLambda, dt)
+      film.fx.circuits = damp(film.fx.circuits, target.fx.circuits, fxLambda, dt)
+      film.fx.bloom = damp(film.fx.bloom, target.fx.bloom, fxLambda, dt)
+
+      /* ---- 9. Screen content ---- */
       const state = getScreenState(progress)
       film.projectIndex = state.projectIndex
       if (state.key !== film.screenKey) {
@@ -244,7 +300,6 @@ export function createDirector({
         screenTextures?.setScreen?.(state.key)
       }
       if (screenTextures) {
-        screenTextures.updateStatus?.(state.key, film.time)
         screenTextures.update?.(film.time)
       }
 

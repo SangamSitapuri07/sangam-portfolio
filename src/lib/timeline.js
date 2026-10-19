@@ -2,23 +2,24 @@
  * The master timeline.
  *
  * One pure, dependency-free module turns scroll progress (0 → 1) into every
- * animated value in the experience: camera, laptop pose, hinge angle, lighting
- * and the active screen. Both the WebGL scene and the DOM overlays read from
- * here, which is what guarantees they can never disagree.
+ * animated value in the experience: camera, machine pose, hinge angle, exploded
+ * amount, studio lighting, atmosphere and the active screen. Both the WebGL scene
+ * and the DOM overlays read from here, which is what guarantees they can never
+ * disagree.
  *
- * Everything is a pure function of `p` plus static config — so scrolling
- * backwards reproduces the forward pass exactly, and nothing accumulates state.
+ * Everything is a pure function of `p` plus static config — so scrolling backwards
+ * reproduces the forward pass exactly, and nothing accumulates state.
  *
  * Keyframes store *anchor-relative* camera descriptions rather than absolute
- * positions, and the camera rig resolves them against the machine's live
- * transform each frame (see `resolveCameraAt`). That keeps the framing correct
- * while the laptop itself rotates and drifts through the storyboard.
+ * positions, and the camera rig resolves them against the machine's live transform
+ * each frame (see `resolveCameraAt`). That keeps the framing correct while the
+ * laptop itself rotates and drifts through the storyboard.
  */
 
-import { scenes, endKeyframe, overlayTiming } from '@/config/scenes'
+import { scenes, overlayTiming } from '@/config/scenes'
 import { projects } from '@/data/projects'
 import { reducedMotion as rmConfig } from '@/config/animation'
-import { defaultAnchors, applyAnchor } from '@/lib/anchors'
+import { resolveCamera } from '@/lib/framing'
 
 /* ------------------------------------------------------------------ *
  * Scroll ranges — derived from each scene's height, so the DOM spacer
@@ -34,7 +35,9 @@ export const sceneRanges = (() => {
     acc += scene.height
     return {
       id: scene.id,
-      name: scene.name,
+      chapter: scene.chapter,
+      anchorId: scene.anchorId,
+      name: scene.id,
       index,
       height: scene.height,
       from,
@@ -51,66 +54,62 @@ export const rangeOf = (id) => sceneRanges.find((range) => range.id === id)
 /** Progress at which a scene is fully composed (what a nav click scrolls to). */
 export const arrivalProgress = (id) => {
   const range = rangeOf(id)
-  return range ? range.from + range.span * 0.35 : 0
+  return range ? range.from + range.span * 0.34 : 0
 }
 
 /* ------------------------------------------------------------------ *
- * Easing helpers
+ * Easing
  * ------------------------------------------------------------------ */
 
 const clamp01 = (value) => (value < 0 ? 0 : value > 1 ? 1 : value)
 
-const smoothstep = (t) => {
+export const smoothstep = (t) => {
   const x = clamp01(t)
   return x * x * (3 - 2 * x)
 }
 
 /**
- * Partially eased interpolation. A full smoothstep between every keyframe makes
- * the camera come to a dead stop at each one; blending only part of the way
- * keeps a continuous velocity through the whole film while still softening the
- * arrivals.
+ * Partially eased interpolation. A full smoothstep between every key makes the
+ * camera come to a dead stop at each one; blending only part of the way keeps a
+ * continuous velocity through the whole film while still softening the arrivals.
  */
-const KEYFRAME_EASE_BIAS = 0.62
+const KEYFRAME_EASE_BIAS = 0.55
 const easeKeyframe = (t) => {
   const eased = smoothstep(t)
   return t + (eased - t) * KEYFRAME_EASE_BIAS
 }
 
-const lerp = (a, b, t) => a + (b - a) * t
-
 /* ------------------------------------------------------------------ *
  * Keyframes
  * ------------------------------------------------------------------ */
 
-/**
- * Rotate a camera around its target, scale its distance, nudge its height.
- * Operates on (and returns) plain arrays so the rig can reuse objects.
- */
-export function orbitCamera(pos, target, { azimuth = 0, distance = 1, height = 0 } = {}) {
-  const dx = pos[0] - target[0]
-  const dz = pos[2] - target[2]
-  const cos = Math.cos(azimuth)
-  const sin = Math.sin(azimuth)
-  const ox = dx * cos - dz * sin
-  const oz = dx * sin + dz * cos
-  pos[0] = target[0] + ox * distance
-  pos[1] = target[1] + (pos[1] - target[1]) * distance + height
-  pos[2] = target[2] + oz * distance
-  return pos
+const toKey = (scene, sceneRange, raw, previous, variant) => {
+  const camera = variant === 'mobile' ? raw.cameraMobile || raw.camera || previous?.camera : raw.camera || previous?.camera
+  return {
+    at: sceneRange.from + sceneRange.span * raw.at,
+    /** Camera intent — resolved to a position against the real viewport aspect. */
+    camera,
+    /* Machine / environment */
+    lid: raw.lid ?? previous?.lid ?? 1,
+    explode: raw.explode ?? previous?.explode ?? 0,
+    rotation: raw.rotation ?? previous?.rotation ?? [0, 0, 0],
+    position: raw.position ?? previous?.position ?? [0, 0, 0],
+    light: raw.light ?? previous?.light ?? { glow: 1, rim: 1, ambient: 0.6 },
+    fx: raw.fx ?? previous?.fx ?? { particles: 0.4, grid: 0.5, circuits: 0.2, bloom: 0.9 },
+    /* Bookkeeping */
+    sceneId: scene.id,
+    beat: null,
+    projectIndex: -1,
+    kind: 'scene',
+  }
 }
-
-const describe = (camera, extra = {}) => ({
-  anchor: camera.anchor,
-  offset: camera.offset,
-  lookAnchor: camera.look.anchor,
-  lookOffset: camera.look.offset || [0, 0, 0],
-  fov: camera.fov,
-  ...extra,
-})
 
 /**
  * Build the sorted keyframe list.
+ *
+ * Each scene's `keys` are resolved in order; anything a key leaves out is carried
+ * forward from the previous key (or the previous scene), which keeps the config
+ * readable and means a scene only states what changes.
  *
  * @param {object}  [options]
  * @param {'desktop'|'mobile'} [options.variant]
@@ -123,75 +122,63 @@ export function buildKeyframes({
   reducedMotion = false,
   projectList = projects,
 } = {}) {
-  const pick = (scene) => (variant === 'mobile' ? scene.cameraMobile || scene.camera : scene.camera)
   const keys = []
+  let previous = null
 
   for (const scene of scenes) {
-    const range = rangeOf(scene.id)
+    const sceneRange = rangeOf(scene.id)
 
-    if (scene.id === 'projects' && projectList.length > 0) {
+    /* Projects: one camera beat per project, interpolated between the scene's
+       first and last key so the scene's own entrance and exit still play. */
+    if (scene.id === 'universe' && projectList.length > 0) {
+      const base = scene.keys[0]
+      const camera = variant === 'mobile' ? base.cameraMobile || base.camera : base.camera
       const beats = scene.beats?.length ? scene.beats : [{ azimuth: 0, distance: 1, height: 0 }]
-      const base = pick(scene)
-      const usable = range.span * 0.82
+      const usable = sceneRange.span * 0.84
       const step = usable / projectList.length
+      const carried = toKey(scene, sceneRange, base, previous, variant)
+      previous = carried
 
       projectList.forEach((project, index) => {
         keys.push({
-          ...describe(base),
-          at: range.from + range.span * 0.09 + step * (index + 0.5),
-          beat: beats[index % beats.length],
-          laptop: {
-            position: scene.laptop.position,
-            rotation: [
-              scene.laptop.rotation[0],
-              scene.laptop.rotation[1] + (index % 2 === 0 ? 0.05 : -0.05),
-              scene.laptop.rotation[2],
-            ],
+          ...carried,
+          at: sceneRange.from + sceneRange.span * 0.08 + step * (index + 0.5),
+          camera: {
+            ...camera,
+            /* Beat values are authored in degrees, like every other camera value. */
+            azimuth: camera.azimuth + beats[index % beats.length].azimuth,
+            elevation: camera.elevation + beats[index % beats.length].height * 14,
+            dolly: camera.dolly / beats[index % beats.length].distance,
           },
-          lid: scene.lid,
-          light: scene.light,
+          beat: null,
+          rotation: [
+            carried.rotation[0],
+            carried.rotation[1] + (index % 2 === 0 ? 0.06 : -0.06),
+            carried.rotation[2],
+          ],
           kind: 'project',
           projectIndex: index,
-          sceneId: scene.id,
         })
       })
       continue
     }
 
-    keys.push({
-      ...describe(pick(scene)),
-      at: range.from + range.span * 0.34,
-      beat: null,
-      laptop: scene.laptop,
-      lid: scene.lid,
-      light: scene.light,
-      kind: 'scene',
-      projectIndex: -1,
-      sceneId: scene.id,
-    })
+    for (const raw of scene.keys) {
+      const resolved = toKey(scene, sceneRange, raw, previous, variant)
+      previous = resolved
+      keys.push(resolved)
+    }
   }
-
-  /* Closing drift: the camera withdraws and the lid settles nearly shut. */
-  const lastRange = sceneRanges[sceneRanges.length - 1]
-  keys.push({
-    ...describe(variant === 'mobile' ? endKeyframe.cameraMobile : endKeyframe.camera),
-    at: lerp(lastRange.from, 1, 0.72),
-    beat: null,
-    laptop: endKeyframe.laptop,
-    lid: endKeyframe.lid,
-    light: endKeyframe.light,
-    kind: 'outro',
-    projectIndex: -1,
-    sceneId: 'contact',
-  })
 
   keys.sort((a, b) => a.at - b.at)
 
   if (reducedMotion) {
-    // Same story, almost no travel: the lid opens once and stays put.
-    const anchorLid = 0.86
+    /* Same story, almost no travel: the hinge opens once and stays put, and the
+       exploded view stops at a hint rather than a full teardown. */
+    const anchorLid = 0.9
     for (const key of keys) {
       key.lid = clamp01(anchorLid + (key.lid - anchorLid) * rmConfig.lidTravelScale)
+      key.explode = key.explode * rmConfig.explodeScale
     }
   }
 
@@ -199,38 +186,22 @@ export function buildKeyframes({
 }
 
 /**
- * Resolve a keyframe's camera into absolute numbers for the machine's current
- * world transform.
+ * Resolve a keyframe's camera into world-space numbers.
  *
- * @param {object} key          keyframe produced by buildKeyframes
- * @param {object} worldAnchors anchor positions already transformed into world space
- * @param {{pos:number[],target:number[]}} out reused output object
+ * @param {object} key      keyframe produced by buildKeyframes
+ * @param {object} subject  world-space silhouette of the posed machine
+ * @param {number} aspect   viewport width ÷ height
+ * @param {'desktop'|'mobile'} variant which stage rectangle to fit into
+ * @param {object} out      reused output object
  */
-export function resolveCameraAt(key, worldAnchors, out) {
-  const pos = out.pos || (out.pos = [0, 0, 0])
-  const target = out.target || (out.target = [0, 0, 0])
-
-  const anchor = worldAnchors[key.anchor] || defaultAnchors[key.anchor] || defaultAnchors.machine
-  const look = worldAnchors[key.lookAnchor] || defaultAnchors[key.lookAnchor] || defaultAnchors.machine
-
-  pos[0] = anchor[0] + key.offset[0]
-  pos[1] = anchor[1] + key.offset[1]
-  pos[2] = anchor[2] + key.offset[2]
-
-  target[0] = look[0] + key.lookOffset[0]
-  target[1] = look[1] + key.lookOffset[1]
-  target[2] = look[2] + key.lookOffset[2]
-
-  if (key.beat) orbitCamera(pos, target, key.beat)
-
-  out.fov = key.fov
-  return out
+export function resolveCameraAt(key, subject, aspect = 16 / 9, variant = 'desktop', out = { pos: [0, 0, 0], target: [0, 0, 0] }) {
+  return resolveCamera(key.camera, subject || FALLBACK_SUBJECT, aspect, variant, out)
 }
 
-/**
- * Locate the keyframe segment covering `p`.
- * @returns {{a:object, b:object, t:number}}
- */
+/** Used before the rig exists (first frames): a machine-sized box at the origin. */
+const FALLBACK_SUBJECT = { centre: [0, 0.85, 0], min: [-1.02, 0, -0.9], max: [1.02, 1.7, 0.9] }
+
+/** Locate the keyframe segment covering `p`. */
 export function findSegment(keys, p) {
   const progress = clamp01(p)
   const count = keys.length
@@ -245,29 +216,50 @@ export function findSegment(keys, p) {
   return { a, b, t, index }
 }
 
+/** Interpolate two keyframes into one pose. Shared by the director and previews. */
+export function blendKeyframes(a, b, t, out = {}) {
+  const lerp = (x, y) => x + (y - x) * t
+  out.lid = lerp(a.lid, b.lid)
+  out.explode = lerp(a.explode, b.explode)
+  out.rotation = [0, 1, 2].map((i) => lerp(a.rotation[i], b.rotation[i]))
+  out.position = [0, 1, 2].map((i) => lerp(a.position[i], b.position[i]))
+  out.light = {
+    glow: lerp(a.light.glow, b.light.glow),
+    rim: lerp(a.light.rim, b.light.rim),
+    ambient: lerp(a.light.ambient, b.light.ambient),
+  }
+  out.fx = {
+    particles: lerp(a.fx.particles, b.fx.particles),
+    grid: lerp(a.fx.grid, b.fx.grid),
+    circuits: lerp(a.fx.circuits, b.fx.circuits),
+    bloom: lerp(a.fx.bloom, b.fx.bloom),
+  }
+  return out
+}
+
 /* ------------------------------------------------------------------ *
  * Screen content
  * ------------------------------------------------------------------ */
 
 /**
- * When each screen interface takes over. Section screens arrive just before the
- * camera does; project screens change halfway through the move, so the new
- * interface is already up when the camera settles on it.
+ * When each screen interface takes over. A section's interface arrives just
+ * before the camera does; a project's changes halfway through its beat, so the
+ * new interface is already up when the camera settles on it.
  */
 export function buildScreenStates({ projectList = projects } = {}) {
   const states = []
 
   for (const scene of scenes) {
-    const range = rangeOf(scene.id)
+    const sceneRange = rangeOf(scene.id)
 
-    if (scene.id === 'projects' && projectList.length > 0) {
-      const usable = range.span * 0.82
+    if (scene.id === 'universe' && projectList.length > 0) {
+      const usable = sceneRange.span * 0.84
       const step = usable / projectList.length
       projectList.forEach((project, index) => {
         states.push({
-          from: range.from + range.span * 0.09 + step * index,
+          from: sceneRange.from + sceneRange.span * 0.08 + step * index,
           key: `projects:${index}`,
-          section: 'projects',
+          section: 'universe',
           projectIndex: index,
           projectId: project.id,
         })
@@ -278,9 +270,8 @@ export function buildScreenStates({ projectList = projects } = {}) {
     states.push({
       /* Each panel takes over a little way into its scene, so the copy is already
          moving when the display changes. The first scene has nothing before it to
-         wait for, so its panel is live from progress 0 — which is what
-         getScreenState() already returns for the opening stretch. */
-      from: range.from === 0 ? 0 : range.from + range.span * 0.04,
+         wait for, so its panel is live from progress 0. */
+      from: sceneRange.from === 0 ? 0 : sceneRange.from + sceneRange.span * 0.05,
       key: scene.screen.section,
       section: scene.screen.section,
       projectIndex: -1,
@@ -319,11 +310,16 @@ export function getActiveSceneIndex(p) {
 
 export const getActiveSceneId = (p) => sceneRanges[getActiveSceneIndex(p)].id
 
+/** The nav item a scene belongs to. */
+export const getActiveNavId = (p) => {
+  const scene = scenes[getActiveSceneIndex(p)]
+  return scene?.nav?.id || 'home'
+}
+
 /**
- * Opacity for a scene's text overlay at progress `p`:
- * fade in → hold → fade out, as fractions of the scene's own window.
- * The first and last scenes fade only on their inner edge, so the page never
- * opens or closes on a blank frame.
+ * Opacity for a scene's text overlay at progress `p`: fade in → hold → fade out,
+ * as fractions of the scene's own window. The first and last scenes fade only on
+ * their inner edge, so the page never opens or closes on a blank frame.
  */
 export function overlayOpacityFor(index, p) {
   const range = sceneRanges[index]
@@ -360,27 +356,30 @@ export function overlayRiseFor(index, p) {
   return smoothstep(rel / Math.max(overlayTiming.enterFraction, 1e-6))
 }
 
-/** Nav items resolve to a scene id, and scenes resolve back to nav items. */
-export const navProgressTargets = {
-  home: arrivalProgress('hero'),
-  about: arrivalProgress('about'),
-  skills: arrivalProgress('skills'),
-  projects: arrivalProgress('projects'),
-  experience: arrivalProgress('experience'),
-  contact: arrivalProgress('contact'),
-}
+/**
+ * Nav targets: the progress a nav click should land on, and the DOM section ids it
+ * can be reached from. Several scenes share one nav item, so a click lands on the
+ * first scene that owns it.
+ */
+export const navProgressTargets = Object.fromEntries(
+  ['home', 'skills', 'projects', 'about', 'contact'].map((id) => {
+    const scene = scenes.find((entry) => entry.nav?.id === id)
+    return [id, scene ? arrivalProgress(scene.id) : 0]
+  })
+)
 
-/** Shared helper so components can map a scene index to its DOM section. */
-export const sectionHeightsVh = scenes.map((scene) => scene.height)
+/** Scene → the DOM section id to scroll to (unique per scene). */
+export const sectionIdOf = (scene) => scene.anchorId || scene.id
 
 export default {
   sceneRanges,
   buildKeyframes,
   resolveCameraAt,
   findSegment,
+  blendKeyframes,
   screenStates,
   getScreenState,
   overlayOpacityFor,
   navProgressTargets,
-  applyAnchor,
+  sectionIdOf,
 }

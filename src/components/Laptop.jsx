@@ -1,4 +1,4 @@
-import { Component, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
 
 import { laptopModel } from '@/config/laptop'
@@ -14,7 +14,8 @@ import { buildProceduralLaptop } from '@/lib/proceduralLaptop'
  *
  * The stand-in renders first, so the stage is never empty; when the scan resolves
  * it takes over. `onRig(rig)` always reports whichever is current — the director
- * does the animating, this component only builds and hands over.
+ * does the animating, this component only builds, binds the displays and hands
+ * over. The GLB is loaded once and reused for the whole session.
  */
 
 class RigErrorBoundary extends Component {
@@ -32,6 +33,7 @@ class RigErrorBoundary extends Component {
     if (import.meta.env?.DEV) {
       console.warn('[laptop] using the procedural stand-in:', error?.message || error)
     }
+    this.props.onFail?.(error)
   }
 
   render() {
@@ -39,9 +41,17 @@ class RigErrorBoundary extends Component {
   }
 }
 
-function ScannedLaptop({ onRig, quality }) {
+function ScannedLaptop({ onRig, quality, textures }) {
   const gltf = useGLTF(laptopModel.url)
   const rig = useMemo(() => assembleLaptop(gltf.scene, { quality }), [gltf, quality])
+
+  /* The screens need their live textures bound after assembly — the rig cannot
+     paint them, and the painter needs a mounted canvas. */
+  useEffect(() => {
+    if (!textures) return undefined
+    rig.setScreenTextures?.(textures)
+    return () => rig.setScreenTextures?.({ main: null, status: null })
+  }, [rig, textures])
 
   useEffect(() => {
     onRig(rig)
@@ -50,19 +60,29 @@ function ScannedLaptop({ onRig, quality }) {
   return <primitive object={rig.machine} />
 }
 
-export default function Laptop({ onRig, quality }) {
+export default function Laptop({ onRig, quality, textures, onModelError }) {
   const [scannedRig, setScannedRig] = useState(null)
+  const fallbackRef = useRef(null)
 
-  const fallbackRig = useMemo(
-    () => (typeof document === 'undefined' ? null : buildProceduralLaptop({ quality })),
-    [quality]
-  )
+  const fallbackRig = useMemo(() => {
+    if (typeof document === 'undefined') return null
+    try {
+      return buildProceduralLaptop({ quality })
+    } catch (error) {
+      if (import.meta.env?.DEV) console.warn('[laptop] stand-in failed to build:', error)
+      return null
+    }
+  }, [quality])
 
-  /* Report the stand-in immediately so the director has something to pose, then
-   * hand over to the scan the moment it arrives. */
+  /* The stand-in is reported immediately so the director always has something to
+     pose; the scan takes over the moment it resolves. */
   useEffect(() => {
-    if (!scannedRig && fallbackRig) onRig?.(fallbackRig)
-  }, [scannedRig, fallbackRig, onRig])
+    if (scannedRig || !fallbackRig) return undefined
+    fallbackRef.current = fallbackRig
+    fallbackRig.setScreenTextures?.(textures)
+    onRig?.(fallbackRig)
+    return undefined
+  }, [scannedRig, fallbackRig, onRig, textures])
 
   const handleScanned = useCallback(
     (rig) => {
@@ -74,12 +94,16 @@ export default function Laptop({ onRig, quality }) {
 
   return (
     <group name="laptop-slot">
-      <RigErrorBoundary>
+      <RigErrorBoundary onFail={onModelError}>
         <Suspense fallback={null}>
-          <ScannedLaptop quality={quality} onRig={handleScanned} />
+          <ScannedLaptop quality={quality} onRig={handleScanned} textures={textures} />
         </Suspense>
       </RigErrorBoundary>
       {!scannedRig && fallbackRig ? <primitive object={fallbackRig.machine} /> : null}
     </group>
   )
 }
+
+/* The model is the only heavy asset; ask drei to fetch it as soon as the module
+   loads rather than when the component first suspends. */
+useGLTF.preload?.(laptopModel.url)

@@ -1,6 +1,6 @@
 # QA checklist — the pass that needs a real browser
 
-Everything in this repository is machine-checked by `npm run verify` (444 content
+Everything in this repository is machine-checked by `npm run verify` (780 content
 assertions, the rig, the painter, the film, contrast). This document is the other
 half: the things a headless sandbox cannot judge, in priority order. Budget
 **20 minutes** for the required sections, an hour for all of it.
@@ -175,7 +175,7 @@ length as before.
 
 ## 10 · Navigation landings
 
-Click each nav item: Home, About, Skills, Projects, Experience, Contact.
+Click each nav item: Home, Skills, Projects, About, Contact.
 
 **Correct:** each lands **inside** the section it names, and that item becomes
 active. Machine-checked via `arrivalProgress`, so the only thing to judge here is
@@ -262,24 +262,27 @@ PR #1.
 | Nuno | recorded demo, phone frame | yes, **if** you drop in a `flutter build web` output |
 | News Pinch | recorded demo, phone frame | no — a native Android APK cannot run in a browser |
 
-### Reference: the seven chapters and their displays
+### Reference: the ten scenes and their displays
 
-| Chapter | Nav label | Screen panel |
-| --- | --- | --- |
-| intro | — | boot |
-| hero | Home | hero |
-| about | About | about |
-| skills | Skills | skills |
-| projects (5 beats) | Projects | projects:0 … projects:4 |
-| experience | Experience | experience |
-| contact | Contact | contact |
+| # | Scene | Nav label | Screen panel |
+| --- | --- | --- | --- |
+| 01 | The Awakening | Home | awakening (boot) |
+| 02 | Into the Machine | Home | engine (hero) |
+| 03 | The Breakdown Protocol | Skills | breakdown |
+| 04 | The Engineering Core | Skills | core |
+| 05 | Project Universe | Projects | projects:0 … projects:2 |
+| 06 | The Deep Dive | Projects | deep-dive |
+| 07 | The Reassembly Protocol | About | rebuild |
+| 08 | Beyond the Code | About | beyond |
+| 09 | The Final Transmission | Contact | transmission |
+| 10 | The Afterglow | Contact | afterglow |
 
 ### Reference: numbers the suites already guarantee
 
 | Fact | Value |
 | --- | --- |
-| Content assertions | 444, plus copy hygiene over 363 strings |
-| Screens checked | 13 canvases × 3 quality tiers |
+| Content assertions | 780, plus copy hygiene over 277 strings |
+| Screens checked | 15 canvases × 3 quality tiers |
 | Director CPU cost | 0.015 ms p95 of a 16.7 ms frame |
 | Reversal agreement | 8×10⁻¹² worst case over 6 checkpoints |
 | Display aspect / resolution | 1.253 × 1.273, 1024 px long edge |

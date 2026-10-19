@@ -32,11 +32,16 @@ export const screenMapping = {
  */
 export const screenSections = [
   'boot',
-  'hero',
-  'about',
-  'skills',
-  'experience',
-  'contact',
+  'awakening',
+  'engine',
+  'breakdown',
+  'core',
+  'universe',
+  'deep-dive',
+  'rebuild',
+  'beyond',
+  'transmission',
+  'afterglow',
 ]
 
 /** Palette used inside the screen interfaces (kept in sync with the site tokens). */

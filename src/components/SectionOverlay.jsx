@@ -1,55 +1,56 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { scenes } from '@/config/scenes'
-import { sceneRanges, overlayOpacityFor, overlayRiseFor } from '@/lib/timeline'
-import { onProgress } from '@/lib/scrollEngine'
-import Intro from '@/sections/Intro'
-import Hero from '@/sections/Hero'
-import About from '@/sections/About'
-import Skills from '@/sections/Skills'
-import Projects from '@/sections/Projects'
-import Experience from '@/sections/Experience'
-import Contact from '@/sections/Contact'
+import { overlayOpacityFor, overlayRiseFor, arrivalProgress } from '@/lib/timeline'
+import { onProgress, scrollToProgress } from '@/lib/scrollEngine'
+import { projects } from '@/data/projects'
+import {
+  Awakening,
+  Machine,
+  Breakdown,
+  Core,
+  Universe,
+  DeepDive,
+  Rebuild,
+  Beyond,
+  Transmission,
+  Afterglow,
+} from '@/sections/chapters'
 
 /**
  * SectionOverlay — the text layer of the film.
  *
- * The page is one tall column: seven sections, each exactly as tall as its scene's
+ * The page is one tall column: ten sections, each exactly as tall as its scene's
  * share of the timeline (`config/scenes.js` heights), so DOM scrolling and 3D
  * progress are the same measurement. Inside each section a sticky viewport-height
  * panel holds the copy, which the scroll engine fades and lifts directly on the
  * DOM node — no React render per frame.
  *
+ * The copy sits wherever the camera left room for it: left of the machine on
+ * desktop, beneath it on phones. Those rectangles come from `lib/framing.js` —
+ * the same ones the camera is fitted against and the composition check asserts —
+ * so the words and the machine cannot end up in the same place.
+ *
  * All content stays in the document at all times, so search engines and screen
  * readers get the whole portfolio whether or not they scroll like a human.
  */
 
-const SECTION_CONTENT = {
-  intro: Intro,
-  hero: Hero,
-  about: About,
-  skills: Skills,
-  projects: Projects,
-  experience: Experience,
-  contact: Contact,
+const CHAPTERS = {
+  awakening: Awakening,
+  engine: Machine,
+  breakdown: Breakdown,
+  core: Core,
+  universe: Universe,
+  'deep-dive': DeepDive,
+  rebuild: Rebuild,
+  beyond: Beyond,
+  transmission: Transmission,
+  afterglow: Afterglow,
 }
 
-/**
- * Where the copy sits relative to the machine. On phones everything drops to the
- * bottom of the viewport — the camera frames the laptop higher there — so text can
- * never land on top of it.
- */
-const ANCHOR_CLASSES = {
-  left: 'items-end justify-center text-center md:items-start md:justify-start md:text-left',
-  right: 'items-end justify-center text-center md:items-center md:justify-end md:text-left',
-  center: 'items-center justify-center text-center',
-  bottom: 'items-end justify-center text-center',
-}
-
-function SceneSection({ index, scene, anchor, sectionId }) {
+function SceneSection({ index, scene, children }) {
   const panelRef = useRef(null)
-  const range = sceneRanges[index]
-  const Content = SECTION_CONTENT[scene.id]
+  const isBanner = scene.keys[0].camera.stage === 'banner'
 
   useEffect(() => {
     const panel = panelRef.current
@@ -78,55 +79,75 @@ function SceneSection({ index, scene, anchor, sectionId }) {
 
   return (
     <section
-      id={sectionId}
+      id={scene.id}
       aria-labelledby={`${scene.id}-heading`}
       data-scene={scene.id}
+      data-nav={scene.nav?.id}
       className="relative"
       style={{ height: `${scene.height}vh` }}
     >
-      <div
-        className={`sticky top-0 mx-auto flex h-[100svh] w-full max-w-[1600px] flex-col px-5 pt-20 pb-28 sm:px-8 sm:pt-24 sm:pb-28 ${
-          ANCHOR_CLASSES[anchor] || ANCHOR_CLASSES.center
-        }`}
-      >
+      <div className="sticky top-0 flex h-[100svh] w-full items-end justify-center px-5 pt-20 pb-6 sm:px-8 sm:pb-10 md:items-center md:justify-start">
         <div
-          ref={panelRef}
-          className="w-full will-change-[opacity,transform]"
-          style={{ opacity: index === 0 ? 1 : 0 }}
+          className={`mx-auto flex w-full max-w-[1600px] flex-col ${
+            isBanner ? 'items-center' : 'items-stretch'
+          }`}
         >
-          <Content />
+          <div
+            ref={panelRef}
+            className={`will-change-[opacity,transform] ${
+              isBanner ? 'w-full max-w-xl text-center' : 'w-full md:max-w-[42vw]'
+            }`}
+            style={{ opacity: index === 0 ? 1 : 0 }}
+          >
+            <div
+              /* Dense chapters can outgrow a phone's lower half; they scroll
+                 inside the panel rather than pushing the film around. */
+              className="max-h-[46svh] overflow-y-auto overscroll-contain pr-1 md:max-h-[88svh]"
+              data-lenis-prevent
+            >
+              {children}
+            </div>
+          </div>
         </div>
       </div>
-      {/* Kept for screen readers so the chapter is announced even before fading in */}
+      {/* Kept for screen readers so the chapter is announced before it fades in */}
       <span className="sr-only">
-        {scene.name}, {Math.round(range.span * 100)}% of the scroll
+        Scene {index + 1} of {scenes.length}: {scene.screen.section}
       </span>
     </section>
   )
 }
 
 export default function SectionOverlay() {
-  const sections = useMemo(
+  /* Which project the deep dive is showing. Lifted here because two chapters
+     write it: a card in Project Universe, and the tabs in the Deep Dive. */
+  const [selectedProject, setSelectedProject] = useState(() => {
+    if (typeof window === 'undefined') return projects[1].id
+    const fromUrl = new URLSearchParams(window.location.search).get('project')
+    return projects.some((project) => project.id === fromUrl) ? fromUrl : projects[1].id
+  })
+
+  const openCaseStudy = useCallback((projectId) => {
+    if (projectId) setSelectedProject(projectId)
+    scrollToProgress(arrivalProgress('deep-dive'))
+  }, [])
+
+  const chapters = useMemo(
     () =>
-      scenes.map((scene, index) => ({
-        scene,
-        index,
-        sectionId: scene.nav?.id || scene.id,
-        anchor: index === 0 ? 'center' : scene.overlay?.anchor || 'center',
-      })),
+      scenes.map((scene, index) => ({ scene, index, Content: CHAPTERS[scene.id] })),
     []
   )
 
   return (
     <main id="main-content" className="overlay-layer">
-      {sections.map(({ scene, index, anchor, sectionId }) => (
-        <SceneSection
-          key={scene.id}
-          index={index}
-          scene={scene}
-          anchor={anchor}
-          sectionId={sectionId}
-        />
+      {chapters.map(({ scene, index, Content }) => (
+        <SceneSection key={scene.id} index={index} scene={scene}>
+          <Content
+            projectId={selectedProject}
+            onSelect={scene.id === 'deep-dive' ? setSelectedProject : openCaseStudy}
+            onOpen={() => openCaseStudy(selectedProject)}
+          />
+        </SceneSection>
       ))}
     </main>
   )

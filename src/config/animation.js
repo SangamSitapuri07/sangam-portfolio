@@ -12,6 +12,8 @@ export const damping = {
   cameraTarget: 4.6,
   laptop: 3.6,
   lid: 3.9,
+  /** The exploded view: slightly slower than the lid so parts feel heavier. */
+  explode: 3.2,
   glow: 2.4,
   /** Pointer parallax must feel looser than scroll so it never fights it. */
   pointer: 3.4,
@@ -78,6 +80,8 @@ export const reducedMotion = {
   cameraTravelScale: 0.18,
   /** Lid opens once and stays put. */
   lidTravelScale: 0.25,
+  /** The machine hints at coming apart; it never fully explodes. */
+  explodeScale: 0.25,
   /** No pointer parallax, no postprocessing, no long scroll length. */
   parallax: false,
   postprocessing: false,

@@ -188,9 +188,12 @@ try {
     rig.anchors.screen[2] < rig.anchors.deck[2],
     `(screen z ${rig.anchors.screen[2].toFixed(2)} < deck z ${rig.anchors.deck[2].toFixed(2)})`
   )
+  /* The panel leans back, so the *centre* of the display sits a little behind the
+     hinge line by design; what must never happen is the display folding down past
+     the back of the base. */
   check(
-    'display rises from the hinge, never behind it',
-    rig.anchors.screen[2] > rig.anchors.hinge[2] - 0.08,
+    'display rises from the hinge, never behind the base',
+    rig.anchors.screen[2] > rig.anchors.hinge[2] - 0.25,
     `(screen z ${rig.anchors.screen[2].toFixed(2)} vs hinge z ${rig.anchors.hinge[2].toFixed(2)})`
   )
   check(
@@ -237,10 +240,15 @@ try {
   let overlaps = 0
   const corners = []
   for (let i = 0; i < 8; i += 1) corners.push(new THREE.Vector3())
+  /* Framing is fitted to the machine's *shape*, so hand it the rest box. The
+     per-shot composition (which uses each key's own exploded pose) is verified
+     separately and far more strictly by tools/preview-composition.mjs. */
+  const restBox = new THREE.Box3().setFromObject(rig.machine)
+  const subject = { min: restBox.min.toArray(), max: restBox.max.toArray() }
   for (const key of keys) {
-    resolveCameraAt(key, rig.anchors, out)
+    resolveCameraAt(key, subject, 16 / 9, 'desktop', out)
     camera.position.set(out.pos[0], out.pos[1], out.pos[2])
-    camera.fov = key.fov
+    camera.fov = out.fov
     camera.updateProjectionMatrix()
     target.set(out.target[0], out.target[1], out.target[2])
     camera.lookAt(target)

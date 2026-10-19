@@ -71,6 +71,7 @@ try {
   const {
     buildKeyframes,
     findSegment,
+    blendKeyframes,
     resolveCameraAt,
     screenStates,
     getScreenState,
@@ -80,7 +81,8 @@ try {
     arrivalProgress,
   } = await server.ssrLoadModule('/src/lib/timeline.js')
   const { scenes } = await server.ssrLoadModule('/src/config/scenes.js')
-  const { defaultAnchors } = await server.ssrLoadModule('/src/lib/anchors.js')
+  const { createSilhouette } = await server.ssrLoadModule('/src/lib/silhouette.js')
+  const { createExplodedView } = await server.ssrLoadModule('/src/lib/explodedView.js')
 
   const file = await readFile(path.join(root, 'public/models/cyberpunk_laptop.glb'))
   const arrayBuffer = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)
@@ -91,6 +93,20 @@ try {
 
   const keyframes = buildKeyframes({ variant: 'desktop', reducedMotion: false })
 
+  /* The camera is fitted to whatever the machine currently occupies, so the
+     purity check has to pose the machine at the same progress before resolving
+     the lens — exactly as the director does each frame. */
+  const silhouette = createSilhouette(rig.machine)
+  const exploded = createExplodedView(rig)
+  const poseAt = (pose) => {
+    rig.machine.position.set(...pose.position)
+    rig.machine.rotation.set(...pose.rotation)
+    rig.applyLid(pose.lid)
+    exploded.apply(pose.explode)
+    rig.machine.updateMatrixWorld(true)
+    return silhouette.refresh()
+  }
+
   /* ------------------------------------------------------------------ 1. purity
    * The interpolated camera is the film's target. Sampled forwards and backwards
    * it must be the same number, not merely a similar one.
@@ -99,8 +115,9 @@ try {
 
   const targetAt = (p, out) => {
     const { a, b, t } = findSegment(keyframes, p)
-    const ca = resolveCameraAt(a, defaultAnchors, { pos: [0, 0, 0], target: [0, 0, 0] })
-    const cb = resolveCameraAt(b, defaultAnchors, { pos: [0, 0, 0], target: [0, 0, 0] })
+    const subject = poseAt(blendKeyframes(a, b, t, {}))
+    const ca = resolveCameraAt(a, subject, 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
+    const cb = resolveCameraAt(b, subject, 16 / 9, 'desktop', { pos: [0, 0, 0], target: [0, 0, 0] })
     for (let i = 0; i < 3; i += 1) {
       out.pos[i] = ca.pos[i] + (cb.pos[i] - ca.pos[i]) * t
       out.target[i] = ca.target[i] + (cb.target[i] - ca.target[i]) * t
@@ -275,10 +292,16 @@ try {
   const median = sorted[Math.floor(sorted.length / 2)]
   const maxStep = sorted[sorted.length - 1]
   check('every sample of the camera path is a real number', finite)
+  const ranked = steps
+    .map((step, index) => ({ step, p: (index + 1) * 0.0005 }))
+    .sort((a, b) => b.step - a.step)
+    .slice(0, 3)
   check(
     'no jump cut between adjacent samples',
     maxStep <= median * 8,
-    `(max step ${maxStep.toFixed(5)} vs median ${median.toFixed(5)} ${median ? `= ${(maxStep / median).toFixed(1)}×` : ''})`
+    `(max step ${maxStep.toFixed(5)} vs median ${median.toFixed(5)} ${median ? `= ${(maxStep / median).toFixed(1)}×` : ''}; ${ranked
+      .map((r) => `${r.step.toFixed(3)}@${r.p.toFixed(3)}`)
+      .join(', ')})`
   )
 
   /* ------------------------------------------------------------------ 4. flicker
@@ -406,7 +429,7 @@ try {
     `(camera moved ${Math.max(...dragged.camera.map((v, i) => Math.abs(v - atRest.camera[i]))).toExponential(1)})`
   )
   check(
-    'a drag leaves the camera target on the anchor',
+    'a drag leaves the camera target where the storyboard put it',
     dragged.target.every((value, i) => Math.abs(value - atRest.target[i]) < 1e-6)
   )
 

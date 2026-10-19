@@ -28,15 +28,54 @@ over the top. The machine is a scan of a cyberpunk laptop, and its hinge is a re
 hinge: the lid pivots on its own axis and lifts so the closed lid never cuts
 through the deck.
 
-| | Scene | What the camera does |
+| # | Scene | What happens |
 | --- | --- | --- |
-| 01 | Intro | Holds a wide shot while the scene loads |
-| 02 | Hero | Rises past the keyboard, lid opening |
-| 03 | About | Pushes in until the display is the subject |
-| 04 | Skills | Swings around the base |
-| 05 | Projects | Five push-ins, one per project, each on its own beat |
-| 06 | Experience | Looks down over the whole machine |
-| 07 | Contact | Pulls back to a wide, lid settling shut |
+| 01 | The Awakening | A shut machine in a near-black room; the lid lifts as the name arrives |
+| 02 | Into the Machine | The lid finishes opening; the camera rises past the keyboard to the display |
+| 03 | The Breakdown Protocol | The signature shot: the camera orbits while the machine comes apart |
+| 04 | The Engineering Core | Inside the opened chassis — programming, frontend, core concepts |
+| 05 | Project Universe | One camera beat per project card, the opened machine behind them |
+| 06 | The Deep Dive | Close on the display for the flagship build, end to end |
+| 07 | The Reassembly Protocol | Scene 03's own explosion, replayed backwards, as the camera settles |
+| 08 | Beyond the Code | Calmer and further out; the person behind the work |
+| 09 | The Final Transmission | Wide, with the contact copy on the left |
+| 10 | The Afterglow | The lid comes down, the room dims, the film ends |
+
+One canvas, one loaded model, ten scenes. The scene list, the scroll length of each
+scene and the camera keys all live in `src/config/scenes.js`; the DOM sections are
+generated from the same array, so copy and 3D can never disagree about where a
+scene begins.
+
+### Framing
+
+A camera is written as intent, not coordinates:
+
+```js
+frame({ azimuth: -20, elevation: 12, stage: 'split', fill: 0.94, dolly: 3.5 })
+```
+
+"From twenty degrees to the machine's left and twelve degrees above it, fitted into
+the copy-free part of the viewport, filling 94% of it, with the lens three and a
+half subject-radii away." `lib/framing.js` resolves that against the machine's
+*measured silhouette* every frame, solving the lens and the aim point so the
+machine fills its stage without cropping. The stages — where the copy is not — are
+defined once, beside the copy rectangles the DOM uses.
+
+That is why the composition survives an ultrawide monitor and a phone without a
+second set of hand-tuned camera numbers, and why an exploded view automatically
+pulls the camera back: the silhouette grew. `tools/preview-composition.mjs` proves
+it against the real geometry by projecting every mesh into screen space and
+asserting that no shot covers its copy column.
+
+Two rules keep the film from feeling like ten clips:
+
+- **Continuity.** Each scene opens on the pose the previous one ended on, and the
+  last sixteen percent of every scene is the travel to the next shot. There is no
+  cut to hide.
+- **Shared definition.** Scene 07's keys are built *from* Scene 03's: the same
+  `explode` values, reversed. The exploded view is a pure function of that one
+  scalar, so the reassembly is the same part transforms played backwards — not a
+  second animation to keep in sync.
 
 ### Architecture
 
@@ -84,15 +123,20 @@ npm run lint       # eslint, no errors
 
 | Command | What it proves |
 | --- | --- |
-| `verify:content` | 444 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
+| `verify:content` | 780 assertions: every data shape, copy hygiene across every string, no dead references, and the counts quoted here |
 | `verify:rig` | Loads the real GLB and asserts the hinge, the anchor points, the display's facing, and that no wide shot parks the machine under the copy column |
 | `verify:dom` | Boots the app in jsdom: zero console errors, one `h1`, working fallback links |
 | `verify:screens` | Paints every screen at every quality tier: correct copy, not blank, no overlapping text, no text off the panel, no glyph outside the font |
-| `verify:film` | Runs the real director against the real rig: the storyboard is a pure function of progress, scrubbing backwards lands on the same pose, the camera never jump-cuts, the display changes panel only on its boundary, and no React state is written from a frame callback |
+| `verify:film` | Runs the real director against the real rig: the storyboard is a pure function of progress, scrubbing backwards lands on the same pose, no scene boundary jump-cuts the camera, a drag turns the machine but leaves the camera exactly where the storyboard put it, and no React state is written from a frame callback |
 | `verify:a11y` | Computes WCAG contrast from the tokens and the utilities actually used, and checks heading order, tabindex, alt text, button names and reduced motion |
 
 `verify:screens` writes previews to `.qa/screens/` (git-ignored) so the panels can
 be looked at without a browser.
+
+Two composition tools cover what the suites above cannot: `node
+tools/preview-film.mjs` (add `--variant=mobile`) renders a storyboard of every
+scene through the real director, and `node tools/preview-composition.mjs` projects
+the machine into screen space and prints where it sits against the copy column.
 
 None of this watches the film animate, measures a real frame rate, or hears a
 screen reader — that pass needs a browser and is written up as a checklist in

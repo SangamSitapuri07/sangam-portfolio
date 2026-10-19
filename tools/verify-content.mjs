@@ -163,6 +163,7 @@ const animation = await load('config/animation.js')
 const quality = await load('config/quality.js')
 const laptop = await load('config/laptop.js')
 const scenes = await load('config/scenes.js')
+const chaptersModule = await load('data/chapters.js')
 
 console.log('▸ animation + quality config')
 for (const key of ['minDisplayMs', 'maxRatePerSecond', 'settleMs', 'fadeMs']) {
@@ -233,26 +234,107 @@ has(laptop, 'parts.lid', { type: 'array', min: 1 })
 has(laptop, 'parallax', { type: 'object' })
 
 console.log('▸ scene storyboard')
-has(scenes, 'scenes', { type: 'array', min: 7 })
+has(scenes, 'scenes', { type: 'array', min: 10 })
 has(scenes, 'navSections', { type: 'array', min: 5 })
 has(scenes, 'overlayTiming', { type: 'object' })
 for (const key of ['enterFraction', 'holdFraction', 'exitFraction']) {
   has(scenes, `overlayTiming.${key}`, { type: 'number' })
 }
+
+/* The ten scenes, in order. The order is the film; a reordering is a creative
+   decision, so it is written down here as well as in the config. */
+const SCENE_ORDER = [
+  'awakening',
+  'engine',
+  'breakdown',
+  'core',
+  'universe',
+  'deep-dive',
+  'rebuild',
+  'beyond',
+  'transmission',
+  'afterglow',
+]
+checks += 1
+if (scenes.scenes.map((scene) => scene.id).join(',') !== SCENE_ORDER.join(',')) {
+  failures.push(`scenes are not in the authored order: ${scenes.scenes.map((scene) => scene.id).join(', ')}`)
+}
+
+/* Every chapter must exist for every scene, and every scene for every chapter:
+   copy and camera work are separate files, so this is the seam that can drift. */
+checks += 1
+if (scenes.scenes.length !== chaptersModule.chapters.length) {
+  failures.push(`scene count (${scenes.scenes.length}) does not match chapter count (${chaptersModule.chapters.length})`)
+}
+for (const scene of scenes.scenes) {
+  checks += 1
+  if (!chaptersModule.chapterById[scene.id]) failures.push(`scene '${scene.id}' has no matching chapter`)
+}
+
 scenes.scenes.forEach((scene) => {
   const where = `scenes[${scene.id ?? '?'}]`
-  for (const key of ['id', 'name', 'height']) has(scene, key, { type: key === 'height' ? 'number' : 'string', label: `${where}.${key}` })
-  has(scene, 'nav', { type: 'object', optional: true, label: `${where}.nav` })
-  has(scene, 'lid', {
-    type: 'number',
-    label: `${where}.lid`,
-    expect: (v) => v >= 0 && v <= 1,
-  })
-  has(scene, 'screen.section', { type: 'string', label: `${where}.screen.section` })
-  for (const key of ['camera', 'cameraMobile', 'laptop', 'light']) {
-    has(scene, key, { type: 'object', label: `${where}.${key}` })
+  for (const key of ['id', 'chapter', 'anchorId']) {
+    has(scene, key, { type: 'string', label: `${where}.${key}` })
   }
-  has(scene, 'overlay.anchor', { type: 'string', label: `${where}.overlay.anchor` })
+  has(scene, 'height', { type: 'number', label: `${where}.height`, expect: (v) => v >= 60 && v <= 400 })
+  has(scene, 'nav', { type: 'object', optional: true, label: `${where}.nav` })
+  has(scene, 'screen.section', { type: 'string', label: `${where}.screen.section` })
+
+  /* Camera keys: intent, never coordinates. Every one must be frameable. */
+  has(scene, 'keys', { type: 'array', min: 1, label: `${where}.keys` })
+  /* Keys inherit whatever the previous key set, so only the first key of a scene
+     has to name everything; the inherited values still have to be in range. */
+  let lid = 1
+  let explode = 0
+  scene.keys?.forEach((key, index) => {
+    const at = `${where}.keys[${index}]`
+    has(key, 'at', { type: 'number', label: `${at}.at`, expect: (v) => v >= 0 && v <= 1 })
+    if (key.lid != null) lid = key.lid
+    if (key.explode != null) explode = key.explode
+    checks += 1
+    if (!(lid >= 0 && lid <= 1)) failures.push(`${at}.lid resolves to ${lid}`)
+    checks += 1
+    if (!(explode >= 0 && explode <= 1)) failures.push(`${at}.explode resolves to ${explode}`)
+    has(key, 'camera', { type: 'object', label: `${at}.camera` })
+    /* `dolly` is a distance in subject-radii — the lens is solved from it, so a
+       non-positive value would divide by zero in framing.js. */
+    for (const field of ['azimuth', 'elevation', 'fill', 'dolly']) {
+      has(key.camera, field, {
+        type: 'number',
+        label: `${at}.camera.${field}`,
+        ...(field === 'dolly' ? { expect: (v) => v > 0.2 && v < 12 } : {}),
+      })
+    }
+    has(key.camera, 'stage', {
+      type: 'string',
+      label: `${at}.camera.stage`,
+      expect: (v) => v === 'split' || v === 'banner',
+    })
+    has(key.cameraMobile, 'stage', {
+      type: 'string',
+      optional: true,
+      label: `${at}.cameraMobile.stage`,
+    })
+  })
+  /* The first key is the scene's establishing shot: it must open on the frame. */
+  checks += 1
+  if (scene.keys?.[0]?.at !== 0) failures.push(`${where} does not start its key list at 0`)
+  /* The establishing key decides where the copy goes; the DOM reads it too. */
+  has(scene.keys?.[0], 'camera.stage', { type: 'string', label: `${where}.establishing stage` })
+  /* Scene 03 and 07 are the same animation run in opposite directions: both must
+     reach a fully exploded machine, or the reassembly has nothing to reverse. */
+  if (scene.id === 'breakdown' || scene.id === 'rebuild') {
+    checks += 1
+    const reachesFull = scene.keys.some((key) => key.explode === 1)
+    if (!reachesFull) failures.push(`${where} never reaches a full exploded view`)
+  }
+  if (scene.id === 'breakdown' || scene.id === 'rebuild') {
+    checks += 1
+    const endsExploded = scene.id === 'breakdown'
+    const last = [...scene.keys].reverse().find((key) => key.explode != null)
+    if (endsExploded && last?.explode !== 1) failures.push('breakdown does not end fully exploded')
+    if (!endsExploded && scene.keys[0].explode !== 1) failures.push('rebuild does not start fully exploded')
+  }
 })
 scenes.navSections.forEach((section, index) => {
   has(section, 'label', { type: 'string', label: `navSections[${index}].label` })
