@@ -1,309 +1,89 @@
-// Projects Data
-// All 5 projects with placeholder details
-// Update real info anytime
-
-import { COLORS } from '@/config/performance.config'
-
+// Current featured projects, dates, and descriptions come from SangamCV.pdf.
+// Repository URLs are checked; Android demos open their original Drive pages.
+// No APKs are bundled or prefetched, and missing screenshots stay optional.
 export const PROJECTS = [
   {
-    id: 'news-pinch',
-    order: 1,
-    
-    // Basic Info
-    title: 'News Pinch',
-    tagline: 'Your daily dose of news, beautifully delivered',
-    shortDescription: 'Android news app with notifications and video shorts',
-    longDescription: 'A complete news application built for Android with categorized news feeds, push notifications, video shorts, and a clean modern interface.',
-    
-    // Platform
-    platform: 'android',
-    platformLabel: 'Android',
-    
-    // Tech Stack (UPDATE LATER)
-    techStack: ['Java', 'Android Studio', 'XML', 'Firebase'],
-    
-    // Features (UPDATE LATER)
-    features: [
-      'Categorized news feeds',
-      'Push notifications',
-      'Video shorts',
-      'Clean modern UI',
-      'Offline reading',
-    ],
-    
-    // Links (UPDATE LATER)
+    id: 'nuno',
+    title: 'Nuno',
+    category: 'Game · Real-time',
+    date: 'Aug 2026',
+    summary: 'A real-time multiplayer card game with validated moves, matchmaking, and configurable room rules for up to eight players.',
+    technologies: ['Node.js', 'TypeScript', 'Express.js', 'PostgreSQL', 'Flutter'],
+    highlights: ['Server-side turn and card validation', 'Rating-based matchmaking and private rooms', 'Official rules and six optional house-rule variants'],
     links: {
-      github: 'https://github.com/SangamSitapuri07/news-pinch',
-      apk: '',
-      playstore: '',
-      live: '',
+      github: 'https://github.com/SangamSitapuri07/Nuno_Backend',
+      live: 'https://drive.google.com/file/d/18CvfcClqI6hI97C6cGeu4zrXlPbNsG-s/view?usp=sharing',
     },
-    
-    // Stats (UPDATE LATER)
-    stats: {
-      buildTime: '6 weeks',
-      linesOfCode: '5000+',
-      users: '100+',
-    },
-    
-    // Demo Configuration
-    demo: {
-      type: 'ui-simulation',
-      component: 'NewsPinchDemo',
-      sampleData: 'hardcoded',
-    },
-    
-    // 3D Scene Configuration
-    scene: {
-      object: 'android-phone',
-      primaryColor: COLORS.projects.newsPinch,
-      secondaryColor: '#4fc3f7',
-      mood: 'dynamic',
-      lighting: 'news-blue',
-    },
-    
-    // Face Reactions
-    faceReactions: {
-      onOpen: 'proud',
-      onInteract: 'nodding',
-      onClose: 'satisfied',
-    },
+    demoLabel: 'Android app · Drive',
+    media: { poster: '/images/projects/nuno.svg', video: null, kind: 'schematic', alt: 'Editorial system sketch for Nuno: rooms, server-validated moves, and matchmaking' },
+    featured: true,
   },
-
-  {
-    id: 'dot-connect',
-    order: 2,
-    
-    title: 'Dot and Connect',
-    tagline: 'Classic strategy with multiplayer and AI',
-    shortDescription: 'Online multiplayer dots and boxes game with AI mode',
-    longDescription: 'A modern take on the classic dots and boxes game. Play against AI offline or challenge friends online with real-time chat.',
-    
-    platform: 'web-android',
-    platformLabel: 'Web + Android',
-    
-    techStack: ['HTML', 'CSS', 'JavaScript', 'Socket.io', 'Node.js'],
-    
-    features: [
-      'Online multiplayer mode',
-      'Offline AI opponent',
-      'Real-time chat with friends',
-      'Room creation and joining',
-      'Smooth animations',
-    ],
-    
-    links: {
-      github: 'https://github.com/SangamSitapuri07/dot-and-connect',
-      live: 'https://your-dot-connect.onrender.com',
-      apk: '',
-    },
-    
-    stats: {
-      buildTime: '4 weeks',
-      linesOfCode: '3000+',
-      gamesPlayed: '500+',
-    },
-    
-    demo: {
-      type: 'embedded-live',
-      component: 'DotConnectDemo',
-      liveUrl: 'https://your-dot-connect.onrender.com',
-    },
-    
-    scene: {
-      object: 'gameboard',
-      primaryColor: COLORS.projects.dotConnect,
-      secondaryColor: '#81c995',
-      mood: 'playful',
-      lighting: 'game-green',
-    },
-    
-    faceReactions: {
-      onOpen: 'excited',
-      onWin: 'celebrating',
-      onLose: 'encouraging',
-      onChat: 'amused',
-    },
-  },
-
   {
     id: 'ai-debate-coach',
-    order: 3,
-    
     title: 'AI Debate Coach',
-    tagline: 'Sharpen your arguments with AI',
-    shortDescription: 'Web-based AI debate platform with 3D animations',
-    longDescription: 'An interactive debate coaching platform powered by AI. Practice your arguments, get real-time feedback, and improve your debating skills with stunning 3D animations.',
-    
-    platform: 'web',
-    platformLabel: 'Web Browser',
-    
-    techStack: ['React', 'Three.js', 'AI API', 'Node.js'],
-    
-    features: [
-      'AI-powered debate coaching',
-      'Beautiful 3D animations',
-      'Real-time argument analysis',
-      'Multiple debate topics',
-      'Interactive feedback system',
-    ],
-    
+    category: 'AI · Interactive web',
+    date: 'Apr 2026',
+    summary: 'A 3D debate-practice arena with AI argument generation, counterarguments, and feedback on clarity, logic, evidence, and impact.',
+    technologies: ['React', 'Three.js', 'Node.js', 'Express.js', 'Gemini', 'Groq'],
+    role: 'AI integration and backend development, collaborating with two teammates.',
     links: {
-      github: 'https://github.com/SangamSitapuri07/ai-debate-coach',
-      live: 'https://your-ai-debate.onrender.com',
+      github: 'https://github.com/SangamSitapuri07/AI-Debate_Coach',
+      live: 'https://debate-coach.netlify.app/',
     },
-    
-    stats: {
-      buildTime: '5 weeks',
-      linesOfCode: '4500+',
-    },
-    
-    demo: {
-      type: 'embedded-live',
-      component: 'AIDebateDemo',
-      liveUrl: 'https://your-ai-debate.onrender.com',
-    },
-    
-    scene: {
-      object: 'ai-figure',
-      primaryColor: COLORS.projects.aiDebate,
-      secondaryColor: '#c4b5fd',
-      mood: 'dramatic',
-      lighting: 'dramatic-purple',
-    },
-    
-    faceReactions: {
-      onOpen: 'serious',
-      onArgument: 'thinking',
-      onGoodPoint: 'impressed',
-      onClose: 'proud',
-    },
+    demoLabel: 'Live demo',
+    media: { poster: '/images/projects/ai-debate-coach.png', video: null, kind: 'screenshot', alt: 'Actual AI Debate Coach learning interface, captured from its frontend source in the empty Argument Generator state'  },
+    featured: true,
   },
-
+  {
+    id: 'news-pinch',
+    title: 'News Pinch',
+    category: 'Android · News',
+    date: 'Mar 2026',
+    summary: 'An Android news application for articles, polls, and video posts, with publishing tools for users and administrators.',
+    technologies: ['Kotlin', 'Android'],
+    highlights: ['Articles, polls, and video-based posts', 'User and administrator contributions', 'YouTube-linked video without an external news API'],
+    links: {
+      github: 'https://github.com/SangamSitapuri07/News-Pinch',
+      live: 'https://drive.google.com/file/d/1i5czKpk2k_Pkq38Buh9PpnFJIZ5UEWsr/view?usp=sharing',
+    },
+    demoLabel: 'Android app · Drive',
+    media: { poster: '/images/projects/news-pinch.svg', video: null, kind: 'schematic', alt: 'Editorial system sketch for News Pinch: articles, polls, and YouTube-linked video on Android' },
+    featured: true,
+  },
+  {
+    id: 'dot-connect',
+    title: 'Dot and Connect',
+    category: 'Game · Real-time',
+    summary: 'A dots-and-boxes game connecting the web and Android through real-time peer-to-peer play.',
+    technologies: ['JavaScript', 'Node.js', 'PeerJS', 'Capacitor'],
+    links: { github: 'https://github.com/SangamSitapuri07/Dot-and-Connect', live: null },
+    media: { poster: '/images/projects/dot-connect.svg', video: null, kind: 'schematic', alt: 'Editorial system sketch for Dot and Connect: a peer-to-peer dots-and-boxes game' },
+    featured: false,
+  },
   {
     id: 'cafe-billing',
-    order: 4,
-    
     title: 'Café Billing',
-    tagline: 'Modern billing with loyalty rewards',
-    shortDescription: 'Android café management app with loyalty points',
-    longDescription: 'Complete café billing system with menu management, real-time billing, customer loyalty points, and analytics. Built for real-world café operations.',
-    
-    platform: 'android',
-    platformLabel: 'Android',
-    
-    techStack: ['Java', 'Android Studio', 'SQLite', 'XML'],
-    
-    features: [
-      'Real-time billing',
-      'Customer loyalty points',
-      'Menu management',
-      'Table management',
-      'Sales analytics',
-      'Receipt generation',
-    ],
-    
-    links: {
-      github: 'https://github.com/SangamSitapuri07/cafe-billing',
-      apk: '',
-    },
-    
-    stats: {
-      buildTime: '5 weeks',
-      linesOfCode: '4000+',
-      cafesUsing: '1+',
-    },
-    
-    demo: {
-      type: 'interactive-simulation',
-      component: 'CafeBillingDemo',
-      sampleData: 'hardcoded',
-    },
-    
-    scene: {
-      object: 'cafe-scene',
-      primaryColor: COLORS.projects.cafeBilling,
-      secondaryColor: '#fcd34d',
-      mood: 'warm',
-      lighting: 'warm-cafe',
-    },
-    
-    faceReactions: {
-      onOpen: 'welcoming',
-      onAddItem: 'approving',
-      onPayment: 'satisfied',
-      onPoints: 'excited',
-    },
+    category: 'Android · Business',
+    summary: 'An Android application for café billing and day-to-day operations.',
+    technologies: ['Kotlin', 'Android'],
+    links: { github: 'https://github.com/SangamSitapuri07/Cafe-Billing', live: null },
+    media: { poster: null, video: null },
+    featured: false,
   },
-
   {
     id: 'polity-notes',
-    order: 5,
-    
     title: 'Polity Notes + Quiz',
-    tagline: 'Master polity with notes and quizzes',
-    shortDescription: 'Android educational app for polity learning',
-    longDescription: 'Educational Android app combining structured polity notes with interactive quizzes. Designed for students preparing for competitive exams or anyone curious about Indian polity.',
-    
-    platform: 'android',
-    platformLabel: 'Android',
-    
-    techStack: ['Java', 'Android Studio', 'SQLite', 'XML'],
-    
-    features: [
-      'Comprehensive polity notes',
-      'Interactive quizzes',
-      'Score tracking',
-      'Topic-wise organization',
-      'Offline access',
-      'Bookmark important notes',
-    ],
-    
-    links: {
-      github: 'https://github.com/SangamSitapuri07/polity-notes',
-      apk: '',
-    },
-    
-    stats: {
-      buildTime: '4 weeks',
-      linesOfCode: '3500+',
-      notesCount: '200+',
-      questionsCount: '500+',
-    },
-    
-    demo: {
-      type: 'interactive-simulation',
-      component: 'PolityNotesDemo',
-      sampleData: 'hardcoded',
-    },
-    
-    scene: {
-      object: 'book-notes',
-      primaryColor: COLORS.projects.polityNotes,
-      secondaryColor: '#fca5a5',
-      mood: 'educational',
-      lighting: 'warm-study',
-    },
-    
-    faceReactions: {
-      onOpen: 'focused',
-      onCorrectAnswer: 'proud',
-      onWrongAnswer: 'encouraging',
-      onComplete: 'celebrating',
-    },
+    category: 'Android · Learning',
+    summary: 'Structured polity notes and quizzes for learning on Android.',
+    technologies: ['Java', 'Android', 'SQLite'],
+    links: { github: null, live: null },
+    media: { poster: null, video: null },
+    featured: false,
   },
 ]
 
-// Helper: Get project by ID
-export const getProjectById = (id) => {
-  return PROJECTS.find(p => p.id === id)
-}
+export const FEATURED_PROJECTS = PROJECTS.filter((project) => project.featured)
 
-// Helper: Get project by scroll progress
-export const getProjectByProgress = (progress, projectScrollRanges) => {
-  return PROJECTS.find(p => {
-    const range = projectScrollRanges[p.id.toUpperCase().replace('-', '_')]
-    if (!range) return false
-    return progress >= range.start && progress < range.end
-  })
+export function getProjectById(id) {
+  return PROJECTS.find((project) => project.id === id)
 }
