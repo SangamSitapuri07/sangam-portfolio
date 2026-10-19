@@ -9,6 +9,7 @@
  */
 
 const listeners = new Set()
+const projectListeners = new Set()
 
 /** Subscribe. Returns an unsubscribe function. */
 export const onDemoRequest = (listener) => {
@@ -21,4 +22,17 @@ export const requestDemo = (projectId) => {
   for (const listener of listeners) listener(projectId)
 }
 
-export default { onDemoRequest, requestDemo }
+/**
+ * The selected case study. The DOM owns the choice (a project card or a tab),
+ * the 3D display has to follow it, and the painter must not read React state.
+ */
+export const onProjectChange = (listener) => {
+  projectListeners.add(listener)
+  return () => projectListeners.delete(listener)
+}
+
+export const announceProject = (projectId) => {
+  for (const listener of projectListeners) listener(projectId)
+}
+
+export default { onDemoRequest, requestDemo, onProjectChange, announceProject }

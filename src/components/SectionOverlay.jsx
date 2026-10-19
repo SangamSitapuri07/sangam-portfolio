@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { scenes } from '@/config/scenes'
 import { overlayOpacityFor, overlayRiseFor, arrivalProgress } from '@/lib/timeline'
 import { onProgress, scrollToProgress } from '@/lib/scrollEngine'
+import { announceProject } from '@/lib/uiBus'
 import { projects } from '@/data/projects'
 import {
   Awakening,
@@ -126,6 +127,11 @@ export default function SectionOverlay() {
     const fromUrl = new URLSearchParams(window.location.search).get('project')
     return projects.some((project) => project.id === fromUrl) ? fromUrl : projects[1].id
   })
+
+  /* The 3D display follows the case study the visitor picked in the DOM. */
+  useEffect(() => {
+    announceProject(selectedProject)
+  }, [selectedProject])
 
   const openCaseStudy = useCallback((projectId) => {
     if (projectId) setSelectedProject(projectId)

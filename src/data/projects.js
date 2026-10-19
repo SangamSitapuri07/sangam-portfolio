@@ -18,6 +18,12 @@
  *   cover         → data for the code-generated cover art (no binary assets needed)
  */
 
+/**
+ * The project the deep dive opens on. It is a data fact, not a painter detail:
+ * the DOM tabs, the 3D display and the screen checks all read this one value.
+ */
+export const flagshipId = 'ai-debate-coach'
+
 export const projects = [
   {
     id: 'nuno',
@@ -141,5 +147,7 @@ export const projects = [
     cover: { from: '#0A1030', via: '#152056', to: '#05060A', mark: 'PINCH' },
   },
 ]
+
+export const flagshipProject = projects.find((project) => project.id === flagshipId) || projects[0]
 
 export default projects

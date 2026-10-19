@@ -177,7 +177,7 @@ const server = await createServer({
 
 try {
   const { createScreenTextures } = await server.ssrLoadModule('/src/lib/screenTextures.js')
-  const { projects } = await server.ssrLoadModule('/src/data/projects.js')
+  const { projects, flagshipProject } = await server.ssrLoadModule('/src/data/projects.js')
   const { skillCategories } = await server.ssrLoadModule('/src/data/skills.js')
   const { profile } = await server.ssrLoadModule('/src/data/profile.js')
 
@@ -308,7 +308,7 @@ try {
     check(`project screen ${project.index} is “${project.name}”`, text.includes(project.name))
     check(`project screen ${project.index} carries a stat`, text.length > 60)
   })
-  check('the deep dive names the flagship project', screenText('deep-dive').includes(projects[0].name))
+  check('the deep dive names the flagship project', screenText('deep-dive').includes(flagshipProject.name))
   check('the reassembly panel describes the parts', screenText('rebuild').length > 80)
   check('contact shows the email', screenText('transmission').includes(profile.contact.email))
 

@@ -25,7 +25,8 @@ import { sceneState } from '@/lib/scrollEngine'
 import { screens as screenConfig } from '@/config/laptop'
 import { screenTheme as theme } from '@/config/screen'
 import { profile } from '@/data/profile'
-import { projects } from '@/data/projects'
+import { projects, flagshipProject } from '@/data/projects'
+import { onProjectChange } from '@/lib/uiBus'
 import { skillCategories } from '@/data/skills'
 import { timeline } from '@/data/timeline'
 import { chapters } from '@/data/chapters'
@@ -97,6 +98,16 @@ export function createScreenTextures({ quality, renderer } = {}) {
      is exactly the kind of render-time read that makes a component lie about its
      dependencies. */
   const readProgress = () => sceneState.film?.progress ?? 0
+  /* The case study the display is showing. The DOM announces the visitor's choice
+     on the bus; the painter never reads React state. */
+  let deepDiveProject = flagshipProject
+  const stopProjectWatch = onProjectChange((projectId) => {
+    const next = projects.find((project) => project.id === projectId)
+    if (!next || next === deepDiveProject) return
+    deepDiveProject = next
+    /* `setScreen` is declared below; this runs on an interaction, never before. */
+    if (currentKey === 'deep-dive') setScreen('deep-dive', true)
+  })
   const maxAnisotropy = renderer?.capabilities?.getMaxAnisotropy?.() ?? 1
   const scale = clamp(quality?.screenQuality ?? 1, 0.5, 1)
 
@@ -874,14 +885,15 @@ export function createScreenTextures({ quality, renderer } = {}) {
 
     y3 += H * 0.38
     /* Keep the chip cloud clear of the chapter rail that closes the panel. */
-    const alsoTop = Math.min(y3, H * 0.66)
+    const alsoTop = Math.min(y3, H * 0.58)
     label(ctx, 'ALSO USING', cx3, alsoTop)
     const also = [...new Set(skillCategories.flatMap((category) => category.also))].slice(0, 5)
-    flowChips(ctx, also, cx3, alsoTop + H * 0.045, colWidth[2], {
+    flowChips(ctx, also, cx3, alsoTop + H * 0.042, colWidth[2], {
       accent,
-      size: 0.0145,
+      size: 0.013,
       gap: 0.012,
-      bottom: H * 0.78,
+      rowGap: 0.036,
+      bottom: H * 0.815,
     })
 
     drawFooter(ctx, 'tools · languages · platforms', 'frontend · backend · programming · dev', accent)
@@ -1381,58 +1393,54 @@ export function createScreenTextures({ quality, renderer } = {}) {
     let by = H * 0.2
     label(ctx, 'PROBLEM · APPROACH', bx, by)
     by += H * 0.055
-    by = bodyText(ctx, profile.about.headline, bx, by, colWidth[1], {
+    by = bodyText(ctx, project.subtitle, bx, by, colWidth[1], {
       size: 0.0215,
       color: theme.ink,
       weight: 500,
       lineHeight: 1.35,
-      maxLines: 3,
+      maxLines: 2,
     })
     by += H * 0.05
+    /* Every line is the project's own copy — the same fields the DOM case study
+       reads. Nothing here is written for the panel. */
     const rows = [
-      ['Problem', 'Practising a debate gives you no opponent and no feedback loop.'],
-      ['Approach', 'A live 3D arena, generated counter-arguments, and a scored rubric.'],
-      ['Built with', 'React Three Fiber on the client, Gemini and Groq behind Express.'],
-      ['Outcome', 'Clarity, logic, evidence and impact are scored after every round.'],
+      ['Problem', screenForm(project.tagline, 96)],
+      ['Approach', firstSentence(project.summary, 104)],
+      ['Implementation', screenForm(project.highlights[0], 104)],
+      ['Outcome', screenForm(project.outcome, 104)],
     ]
     rows.forEach(([labelText, body]) => {
-      text(ctx, labelText, bx, by, { size: Math.round(H * 0.0185), mono: true, color: accent, spacing: 1.2 })
-      by += H * 0.032
+      by += H * 0.012
+      text(ctx, labelText, bx, by, { size: Math.round(H * 0.018), mono: true, color: accent, spacing: 1.2 })
+      by += H * 0.028
       by = bodyText(ctx, body, bx, by, colWidth[1], {
-        size: 0.0195,
+        size: 0.0185,
         color: theme.inkSoft,
-        lineHeight: 1.34,
-        maxLines: 3,
+        lineHeight: 1.3,
+        maxLines: 4,
       })
-      by += H * 0.03
+      by += H * 0.02
     })
 
-    /* Column C — the scorecard, drawn as the product's own idea. */
+    /* Column C — the project's real figures and the role. No invented scores: if a
+       number is not in the data, it is not on the panel. */
     const cx3 = colX[2]
     let y3 = H * 0.2
-    label(ctx, 'SCORECARD', cx3, y3)
+    label(ctx, 'AT A GLANCE', cx3, y3)
     y3 += H * 0.06
-    const scorecard = [
-      ['Clarity', 0.86],
-      ['Logic', 0.78],
-      ['Evidence', 0.7],
-      ['Impact', 0.82],
-    ]
-    scorecard.forEach(([name, value], index) => {
-      const rowY = y3 + index * H * 0.075
-      text(ctx, name, cx3, rowY, { size: Math.round(H * 0.021), color: theme.inkSoft })
-      text(ctx, String(Math.round(value * 100)), cx3 + colWidth[2], rowY, {
-        size: Math.round(H * 0.021),
+    ;(project.stats || []).slice(0, 3).forEach((stat, index) => {
+      const rowY = y3 + index * H * 0.085
+      text(ctx, stat.value, cx3, rowY, { size: Math.round(H * 0.036), weight: 600, color: theme.ink })
+      text(ctx, stat.label, cx3, rowY + H * 0.032, {
+        size: Math.round(H * 0.0175),
         mono: true,
-        align: 'right',
         color: theme.inkFaint,
+        spacing: 1,
       })
       ctx.fillStyle = 'rgba(255,255,255,0.08)'
-      ctx.fillRect(cx3, rowY + H * 0.014, colWidth[2], 3)
-      ctx.fillStyle = accent
-      ctx.fillRect(cx3, rowY + H * 0.014, colWidth[2] * value, 3)
+      ctx.fillRect(cx3, rowY + H * 0.05, colWidth[2], 1)
     })
-    y3 += H * 0.34
+    y3 += H * 0.30
     label(ctx, 'ROLE', cx3, y3)
     y3 += H * 0.04
     bodyText(ctx, project.role, cx3, y3, colWidth[2], {
@@ -1652,7 +1660,7 @@ export function createScreenTextures({ quality, renderer } = {}) {
     engine: (ctx) => paintHero(ctx, 0),
     breakdown: (ctx) => paintBreakdown(ctx),
     core: (ctx) => paintSkills(ctx),
-    'deep-dive': (ctx) => paintDeepDive(ctx, projects[0]),
+    'deep-dive': (ctx) => paintDeepDive(ctx, deepDiveProject),
     rebuild: (ctx) => paintRebuild(ctx),
     beyond: (ctx) => paintAbout(ctx),
     transmission: (ctx) => paintContact(ctx, 0),
@@ -1736,6 +1744,7 @@ export function createScreenTextures({ quality, renderer } = {}) {
   }
 
   function dispose() {
+    stopProjectWatch()
     mainTexture.dispose()
     statusTexture.dispose()
     mainCanvas.width = 0

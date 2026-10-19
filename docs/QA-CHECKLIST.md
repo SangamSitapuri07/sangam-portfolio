@@ -1,6 +1,6 @@
 # QA checklist — the pass that needs a real browser
 
-Everything in this repository is machine-checked by `npm run verify` (780 content
+Everything in this repository is machine-checked by `npm run verify` (779 content
 assertions, the rig, the painter, the film, contrast). This document is the other
 half: the things a headless sandbox cannot judge, in priority order. Budget
 **20 minutes** for the required sections, an hour for all of it.
@@ -281,7 +281,7 @@ PR #1.
 
 | Fact | Value |
 | --- | --- |
-| Content assertions | 780, plus copy hygiene over 277 strings |
+| Content assertions | 779, plus copy hygiene over 277 strings |
 | Screens checked | 15 canvases × 3 quality tiers |
 | Director CPU cost | 0.015 ms p95 of a 16.7 ms frame |
 | Reversal agreement | 8×10⁻¹² worst case over 6 checkpoints |
